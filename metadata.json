@@ -1,6 +1,6 @@
 {
-  "name": "Simulasi Letusan Krakatau",
-  "description": "Simulasi trajektori interaktif untuk letusan Gunung Krakatau 1883 dengan perhitungan gerak parabola dan hambatan udara.",
+  "name": "Simulasi Trajektori Letusan Gunung Api | UNS",
+  "description": "Simulasi trajektori interaktif letusan gunung berapi dengan perhitungan gerak parabola dan dinamika fluida.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

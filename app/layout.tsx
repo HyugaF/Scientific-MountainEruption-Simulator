@@ -2,17 +2,20 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: 'My Google AI Studio App',
-  description: 'An application built with Google AI Studio.',
+  title: 'Simulasi Trajektori Letusan Gunung Api | Informatika UNS',
+  description: 'Simulator trajektori vulkanik interaktif untuk memprediksi sebaran proyektil dan awan abu vulkanik.',
+  icons: {
+    icon: '/image.png',
+  },
   openGraph: {
-    title: 'My Google AI Studio App',
-    description: 'An application built with Google AI Studio.',
+    title: 'Simulasi Trajektori Letusan Gunung Api',
+    description: 'Simulator trajektori vulkanik interaktif.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'My Google AI Studio App',
-    description: 'An application built with Google AI Studio.',
+    title: 'Simulasi Trajektori Letusan Gunung Api',
+    description: 'Simulator trajektori vulkanik interaktif.',
   },
 };
 
