@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup, CircleMarker, Circle, useMap, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, CircleMarker, Circle, useMap, LayersControl, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { PhysicsParams, TrajectoryPoint, AshPoint } from '@/utils/physics';
@@ -18,8 +18,9 @@ const icon = L.icon({
 interface Props {
   mode: SimulationMode;
   ballisticResult: {
-    primary: { trajectory: TrajectoryPoint[] };
-    spread: { trajectory: TrajectoryPoint[] }[];
+    primary: import('@/utils/physics').TrajectoryResult;
+    worstCase: import('@/utils/physics').TrajectoryResult;
+    spread: import('@/utils/physics').TrajectoryResult[];
   };
   aerosolResult: {
     trajectory: AshPoint[];
@@ -75,58 +76,84 @@ export default function MapVisualizer({ mode, ballisticResult, aerosolResult, pr
           </LayersControl.BaseLayer>
         </LayersControl>
 
-        {/* SHOCKWAVE / SEISMIC ANIMATION */}
+        {/* SHOCKWAVE / SEISMIC ANIMATION (Physically Accurate) */}
         {(() => {
           if (progressIndex === 0) return null;
           
-          // Safety check to ensure startPos is valid (not undefined/NaN)
           if (!startPos || typeof startPos[0] !== 'number' || typeof startPos[1] !== 'number' || isNaN(startPos[0]) || isNaN(startPos[1])) {
              return null;
           }
 
-          // Energy proxy based on Mass and Velocity (Ek = 0.5 * m * v^2)
-          // We scale it down significantly to get a usable radius in meters.
-          const energyFactor = (params.mass * Math.pow(params.v0, 2)) / 1e6; 
-          const maxRadius = Math.min(250000, 5000 + (isNaN(energyFactor) ? 0 : energyFactor * 2)); // Cap at 250km
+          // In our physics engine (utils/physics.ts), the step size (dt) is typically 0.1s.
+          // progressIndex is effectively the number of ticks.
+          // Real-world time elapsed in seconds:
+          const dt = 0.1;
+          const timeElapsedSeconds = progressIndex * dt; 
+
+          // Propagation Velocities (meters per second)
+          const VELOCITY_SEISMIC = 5000; // ~5 km/s for crustal P-waves/Surface waves
+          const VELOCITY_ACOUSTIC = 343; // ~343 m/s for atmospheric shockwave (Speed of sound)
+
+          // Current Radius (r = v * t)
+          const currentRadiusSeismic = VELOCITY_SEISMIC * timeElapsedSeconds;
+          const currentRadiusAcoustic = VELOCITY_ACOUSTIC * timeElapsedSeconds;
+
+          // Energy Proxy (To determine maximum propagation distance before attenuation)
+          // E_k = 1/2 * m * v^2
+          const energyKj = 0.5 * params.mass * Math.pow(params.v0, 2) / 1000;
           
-          // Progress of the shockwave (it travels much faster than the particles)
-          // Let's make it expand quickly within the first ~40 simulation ticks.
-          const shockwaveProgress = Math.min(1, progressIndex / 40);
+          // Logarithmic scaling for realistic attenuation based on energy levels
+          const baseLog = Math.max(0, Math.log10((isNaN(energyKj) ? 0 : energyKj) + 1));
           
-          if (shockwaveProgress >= 1) return null; // Disappear after expanding
+          // Max Distances (Atenuasi Fisika)
+          // 1. Seismic wave (Volcanic tremors attenuate fast due to fractured crust)
+          // Range: ~50 km (small eruptions) to ~800 km (supervolcanoes)
+          const maxDistanceSeismic = 10000 + Math.pow(baseLog, 2.5) * 2000; 
           
-          let currentRadius = maxRadius * Math.pow(shockwaveProgress, 0.5); // Fast initial expansion
-          // Fallback to 0 if NaN somehow creeps in
-          if (isNaN(currentRadius) || currentRadius < 0) currentRadius = 0;
-          
-          const opacity = 1 - shockwaveProgress; // Fade out as it expands
+          // 2. Acoustic wave (Infrasound/Barometric waves travel incredibly far, eg. Krakatoa heard 4800km away)
+          // Range: ~100 km (small) to ~10,000+ km (supervolcanoes)
+          const maxDistanceAcoustic = 20000 + Math.pow(baseLog, 4) * 1200;
+
+          // Attenuation (Fade out opacity based on distance traveled vs max distance)
+          // The seismic wave travels VERY fast, so it will disappear quickly from the map.
+          // The acoustic wave travels slower, lingering longer.
+          const opacitySeismic = Math.max(0, 1 - (currentRadiusSeismic / maxDistanceSeismic));
+          const opacityAcoustic = Math.max(0, 1 - (currentRadiusAcoustic / maxDistanceAcoustic));
+
+          // If both have faded out completely, stop rendering them to save performance
+          if (opacitySeismic <= 0 && opacityAcoustic <= 0) return null;
 
           return (
             <>
-              {/* Outer fast shockwave (Atmospheric) */}
-              <Circle 
-                center={startPos}
-                radius={currentRadius * 1.5}
-                pathOptions={{
-                  color: '#ffffff',
-                  fillColor: 'transparent',
-                  weight: 2,
-                  opacity: opacity * 0.6,
-                  dashArray: '4 8'
-                }}
-              />
-              {/* Inner strong seismic tremor (Ground) */}
-              <Circle 
-                center={startPos}
-                radius={currentRadius}
-                pathOptions={{
-                  color: '#ef4444',
-                  fillColor: '#ef4444',
-                  weight: 4,
-                  opacity: opacity,
-                  fillOpacity: opacity * 0.2,
-                }}
-              />
+              {/* Inner strong seismic tremor (Ground P/S/Surface Waves) */}
+              {opacitySeismic > 0 && (
+                <Circle 
+                  center={startPos}
+                  radius={currentRadiusSeismic}
+                  pathOptions={{
+                    color: '#ef4444',
+                    fillColor: '#ef4444',
+                    weight: Math.max(1, 4 * opacitySeismic), // Line thins out as it travels
+                    opacity: opacitySeismic * 0.8,
+                    fillOpacity: opacitySeismic * 0.1,
+                  }}
+                />
+              )}
+              
+              {/* Outer slow shockwave (Atmospheric / Infrasound) */}
+              {opacityAcoustic > 0 && (
+                <Circle 
+                  center={startPos}
+                  radius={currentRadiusAcoustic}
+                  pathOptions={{
+                    color: '#ffffff',
+                    fillColor: 'transparent',
+                    weight: 2,
+                    opacity: opacityAcoustic * 0.7,
+                    dashArray: '4 8'
+                  }}
+                />
+              )}
             </>
           );
         })()}
@@ -236,17 +263,43 @@ export default function MapVisualizer({ mode, ballisticResult, aerosolResult, pr
                 .map(p => [p.lat, p.lng]);
                 
               const currentPos: [number, number] = positions[positions.length - 1] || startPos;
+              const angle = ballisticResult.primary.telemetry?.angle.toFixed(1) || 45;
               
               return (
                 <React.Fragment>
-                  <Polyline positions={positions} color="#ef4444" weight={3} opacity={0.9} />
+                  <Polyline positions={positions} color="#ef4444" weight={4} opacity={0.9} />
                   {positions.length > 1 && (
-                    <CircleMarker center={currentPos} radius={5} pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }}>
-                      <Popup>
-                        <div className="text-xs">
-                          <b>Posisi Utama</b><br />Lat: {currentPos[0].toFixed(4)}<br />Lng: {currentPos[1].toFixed(4)}
-                        </div>
-                      </Popup>
+                    <CircleMarker center={currentPos} radius={6} pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }}>
+                      <Tooltip permanent direction="right" offset={[10, 0]} className="bg-neutral-900 border-neutral-800 text-white text-xs opacity-90 shadow-lg">
+                        <span className="text-red-400 font-bold">Utama</span> (Elevasi: {angle}°)
+                      </Tooltip>
+                    </CircleMarker>
+                  )}
+                </React.Fragment>
+              );
+            })()}
+
+            {/* Worst Case Trajectory (Green) */}
+            {(() => {
+              if (!ballisticResult.worstCase) return null;
+              
+              const currentWorstCase = ballisticResult.worstCase.trajectory.slice(0, progressIndex + 1);
+              const step = Math.max(1, Math.floor(currentWorstCase.length / 100));
+              const positions: [number, number][] = currentWorstCase
+                .filter((_, i) => i % step === 0 || i === currentWorstCase.length - 1)
+                .map(p => [p.lat, p.lng]);
+                
+              const currentPos: [number, number] = positions[positions.length - 1] || startPos;
+              const angle = ballisticResult.worstCase.telemetry?.angle.toFixed(1) || 45;
+              
+              return (
+                <React.Fragment>
+                  <Polyline positions={positions} color="#22c55e" weight={4} opacity={0.9} />
+                  {positions.length > 1 && (
+                    <CircleMarker center={currentPos} radius={6} pathOptions={{ color: '#22c55e', fillColor: '#22c55e', fillOpacity: 1 }}>
+                      <Tooltip permanent direction="left" offset={[-10, 0]} className="bg-neutral-900 border-neutral-800 text-white text-xs opacity-90 shadow-lg">
+                        <span className="text-green-400 font-bold">Worst Case</span> (Elevasi: {angle}°)
+                      </Tooltip>
                     </CircleMarker>
                   )}
                 </React.Fragment>

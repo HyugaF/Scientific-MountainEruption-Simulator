@@ -377,15 +377,17 @@ export default function InputPanel({
               <div className="p-6 overflow-y-auto custom-scrollbar text-sm text-neutral-300 space-y-6">
                 
                 <section className="space-y-2">
-                  <h4 className="text-orange-400 font-semibold mb-2">1. Trajektori Balistik (Efek Drag Aerodinamis)</h4>
-                  <p>Aplikasi ini mengintegrasikan hukum Newton kedua dengan gaya hambat fluida (Barometric Drag) untuk menghitung posisi (x, y, z) proyektil (bom vulkanik) di setiap detik penerbangannya:</p>
+                  <h4 className="text-orange-400 font-semibold mb-2">1. Trajektori Balistik (Integrasi RK4 & ISA 1976)</h4>
+                  <p>Aplikasi ini tidak menggunakan aproksimasi Euler sederhana. Kami mengintegrasikan hukum Newton kedua menggunakan <b>4th-Order Runge-Kutta (RK4)</b> untuk akurasi numerik tertinggi. Simulasi juga memecah ejekta menjadi spektrum partikel (Total Grain Size Distribution):</p>
                   <div className="bg-neutral-800 p-3 rounded-lg border border-neutral-700 font-mono text-xs overflow-x-auto text-blue-300">
-                    F_drag = -½ ρ v² C_d A
+                    F_drag = -½ ρ(z) v² C_d(M) A<br/>
+                    ρ(z), T(z), a(z) = US Standard Atmosphere 1976
                   </div>
                   <ul className="list-disc pl-5 space-y-1 text-neutral-400 mt-2">
-                    <li><b>ρ (Rho)</b>: Densitas udara standar di permukaan laut (~1.225 kg/m³).</li>
-                    <li><b>C_d</b>: Koefisien drag, bervariasi bergantung bentuk batu (0.1 untuk bulat sempurna hingga 1.0+ untuk batu apung kasar).</li>
-                    <li><b>A</b>: Luas penampang lintang proyektil, dihitung dari asumsi densitas batu basalt (2500 kg/m³).</li>
+                    <li><b>Bom Vulkanik Berat (Boulders)</b>: Memiliki inersia raksasa yang tidak terpengaruh gaya geser angin. Memancar 360 derajat (radial) jatuh di area terdekat (<i>Ballistic Hazard Zone</i>).</li>
+                    <li><b>Lapilli & Coarse Ash</b>: Memiliki rasio massa-terhadap-luas (area-to-mass) rendah, sehingga terseret secara parabolik-elips mengikuti arah vektor angin (<i>Suspended Regime</i>).</li>
+                    <li><b>Barometric Density ρ(z)</b>: Diukur presisi menggunakan <i>US Standard Atmosphere 1976</i>. Proyektil di stratosfer nyaris tidak mengalami gaya hambat (F_drag) karena profil kerapatan udara logaritmik.</li>
+                    <li><b>Mach-Dependent Wave Drag C_d(M)</b>: Ejekta vulkanik melesat di kecepatan supersonik (v &gt; 343 m/s). Koefisien hambat udara (C_d) diprogram untuk melonjak tajam saat menembus <i>sound barrier</i> (Transonic/Supersonic Wave Drag), mendistorsi trajektori jauh dari kurva parabola ideal.</li>
                   </ul>
                 </section>
 
@@ -438,13 +440,15 @@ export default function InputPanel({
 
                 <section className="space-y-2">
                   <h4 className="text-orange-400 font-semibold mb-2">7. Gelombang Seismik & Kejut Atmosferik</h4>
-                  <p>Simulasi merender rambatan gelombang kejut (shockwave) di awal letusan berdasarkan turunan proksi energi kinetik proyektil:</p>
+                  <p>Simulasi merender rambatan gelombang berdasar pada konstanta kecepatan fisik (<i>r = v × t</i>). Jarak atenuasi (pelemahan) maksimal dikalibrasi menggunakan persamaan logaritmik berdasarkan referensi vulkanologi:</p>
                   <div className="bg-neutral-800 p-3 rounded-lg border border-neutral-700 font-mono text-xs overflow-x-auto text-purple-300">
-                    Radius Maksimal ≈ f(E_k) ; di mana E_k = ½ m v₀²
+                    r(t) = v × t<br/>
+                    Atenuasi Seismik ∝ log₁₀(E_k)^2.5<br/>
+                    Atenuasi Akustik ∝ log₁₀(E_k)^4
                   </div>
                   <ul className="list-disc pl-5 space-y-1 text-neutral-400 mt-2">
-                    <li><b>Ground Tremor (Cincin Merah)</b>: Mewakili rambatan gelombang seismik permukaan yang dipicu oleh pelepasan energi di kawah. Atenuasi (pelemahan) divisualisasikan melalui <i>opacity</i> yang memudar.</li>
-                    <li><b>Atmospheric Shockwave (Cincin Putih)</b>: Gelombang tekanan akustik (infrasonik) yang merambat melalui medium udara 1.5x lebih cepat dari tremor proksimal (kecepatan suara ~343 m/s), memicu ledakan sonik yang dapat memecahkan kaca hingga jarak ratusan kilometer.</li>
+                    <li><b>Ground Tremor (Cincin Merah)</b>: Gelombang Seismik (P/S-Wave). Kecepatan merambat sangat tinggi di litosfer (<b>~5.000 m/s</b>), namun energi gempa vulkanik teredam kuat secara lokal (atenuasi tinggi) sehingga cincin merah akan cepat menghilang pada radius 50-800 km tergantung VEI letusan.</li>
+                    <li><b>Atmospheric Shockwave (Cincin Putih)</b>: Gelombang Infrasonik (akustik). Merambat lebih lambat pada kecepatan suara (<b>~343 m/s</b>), namun memiliki atenuasi rendah di udara. Radius jangkauannya divalidasi mampu mengelilingi ribuan kilometer tanpa kehilangan inersia.</li>
                   </ul>
                 </section>
 

@@ -2,16 +2,19 @@
 import { useState } from 'react';
 import { TrajectoryPoint, AshPoint, AcademicMetrics } from '@/utils/physics';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
-import { Target, Mountain, Clock, Globe, Wind, Zap, Flame, ThermometerSnowflake, Download, Table2, BarChart2 } from 'lucide-react';
+import { Target, Mountain, Clock, Globe, Wind, Zap, Flame, ThermometerSnowflake, Download, Table2, BarChart2, Calculator } from 'lucide-react';
 import { SimulationMode } from '@/hooks/useSimulation';
 
 interface Props {
   mode: SimulationMode;
   ballisticResult: {
-    primary: { trajectory: TrajectoryPoint[] };
+    primary: import('@/utils/physics').TrajectoryResult;
+    worstCase: import('@/utils/physics').TrajectoryResult;
+    spread: import('@/utils/physics').TrajectoryResult[];
     maxDistance: number;
     maxHeight: number;
     timeOfFlight: number;
+    telemetry?: any;
   };
   aerosolResult: {
     trajectory: AshPoint[];
@@ -23,7 +26,7 @@ interface Props {
 }
 
 export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, academicMetrics, progressIndex }: Props) {
-  const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
+  const [viewMode, setViewMode] = useState<'chart' | 'table' | 'telemetry'>('chart');
   
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
@@ -74,6 +77,9 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
         {/* Header Actions */}
         <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
           <div className="flex bg-neutral-800 rounded-lg p-1 border border-neutral-700">
+            <button onClick={() => setViewMode('telemetry')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'telemetry' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-white'}`} title="Perhitungan Langsung (Telemetri)">
+              <Calculator className="w-4 h-4" />
+            </button>
             <button onClick={() => setViewMode('chart')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'chart' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`}>
               <BarChart2 className="w-4 h-4" />
             </button>
@@ -159,7 +165,7 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
               </ResponsiveContainer>
             </div>
           </>
-        ) : (
+        ) : viewMode === 'table' ? (
           <div className="flex-1 overflow-auto border border-neutral-800 rounded-lg">
             <table className="w-full text-left text-xs text-neutral-400">
               <thead className="bg-neutral-800/50 text-neutral-300 sticky top-0 uppercase font-medium">
@@ -185,6 +191,97 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
                 ))}
               </tbody>
             </table>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto p-4 bg-neutral-950/50 rounded-lg border border-neutral-800 text-sm">
+            <h3 className="text-orange-400 font-semibold mb-4 flex items-center gap-2">
+              <Calculator className="w-4 h-4" /> Log Perhitungan Saintifik (Skenario Terburuk / Garis Hijau)
+            </h3>
+            
+            {ballisticResult.telemetry ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Massa & Radius Benda */}
+                <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
+                  <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Radius Proyektil (r)</div>
+                  <div className="font-mono text-[10px] text-blue-300 mb-1">
+                    r = (m / (ρ_rock * 4/3 * π))^(1/3)
+                  </div>
+                  <div className="font-mono text-[10px] text-neutral-400 mb-2">
+                    r = ({ballisticResult.telemetry.mass.toFixed(1)} / ({ballisticResult.telemetry.rockDensity} * 1.333 * 3.14))^(1/3)
+                  </div>
+                  <div className="font-mono text-sm text-neutral-200">
+                    r = {ballisticResult.telemetry.radius.toFixed(3)} m
+                  </div>
+                </div>
+
+                {/* Initial Mach Number */}
+                <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
+                  <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Mach Number Awal (M)</div>
+                  <div className="font-mono text-[10px] text-blue-300 mb-1">
+                    M = V0 / a_initial
+                  </div>
+                  <div className="font-mono text-[10px] text-neutral-400 mb-2">
+                    M = {ballisticResult.telemetry.launchVelocity.toFixed(1)} / {ballisticResult.telemetry.initialA.toFixed(1)}
+                  </div>
+                  <div className="font-mono text-sm text-neutral-200">
+                    M = {(ballisticResult.telemetry.launchVelocity / ballisticResult.telemetry.initialA).toFixed(3)}
+                  </div>
+                  <div className="text-[9px] text-orange-400 mt-1">Status: {(ballisticResult.telemetry.launchVelocity / ballisticResult.telemetry.initialA) > 1.0 ? 'Supersonic (Shockwave Drag)' : 'Subsonic'}</div>
+                </div>
+
+                {/* Gaya Hambat Udara (Drag) */}
+                <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
+                  <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Gaya Hambat Awal (F_drag)</div>
+                  <div className="font-mono text-[10px] text-blue-300 mb-1">
+                    F_drag = ½ * ρ * V0² * Cd * A
+                  </div>
+                  <div className="font-mono text-[10px] text-neutral-400 mb-2">
+                    F_drag = 0.5 * {ballisticResult.telemetry.initialRho.toFixed(3)} * {Math.pow(ballisticResult.telemetry.launchVelocity, 2).toFixed(1)} * {ballisticResult.telemetry.baseCd} * {(Math.PI * Math.pow(ballisticResult.telemetry.radius, 2)).toFixed(3)}
+                  </div>
+                  <div className="font-mono text-sm text-neutral-200">
+                    F_drag = {((0.5 * ballisticResult.telemetry.initialRho * Math.pow(ballisticResult.telemetry.launchVelocity, 2) * ballisticResult.telemetry.baseCd * (Math.PI * Math.pow(ballisticResult.telemetry.radius, 2))) / 1000).toFixed(2)} kN
+                  </div>
+                </div>
+
+                {/* Parameter Coriolis */}
+                <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
+                  <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Parameter Coriolis (f)</div>
+                  <div className="font-mono text-[10px] text-blue-300 mb-1">
+                    f = 2 * Ω * sin(latitude)
+                  </div>
+                  <div className="font-mono text-[10px] text-neutral-400 mb-2">
+                    f = 2 * 0.000072921 * sin(lat_rad)
+                  </div>
+                  <div className="font-mono text-sm text-neutral-200">
+                    f = {ballisticResult.telemetry.coriolisF.toExponential(4)} s⁻¹
+                  </div>
+                  <div className="text-[9px] text-orange-400 mt-1">Membelokkan partikel ke {(ballisticResult.telemetry.coriolisF > 0) ? 'Kanan (Belahan Bumi Utara)' : (ballisticResult.telemetry.coriolisF < 0) ? 'Kiri (Belahan Bumi Selatan)' : 'Nihil (Ekuator)'}</div>
+                </div>
+                
+                {/* Max Values Info */}
+                <div className="p-3 bg-neutral-900 rounded border border-neutral-800 md:col-span-2 flex justify-between items-center">
+                   <div>
+                     <div className="text-xs text-neutral-500 uppercase">Mach Number Puncak (Sepanjang Trajektori)</div>
+                     <div className="font-mono text-neutral-200">M {ballisticResult.telemetry.maxMach.toFixed(2)}</div>
+                   </div>
+                   <div className="text-right">
+                     <div className="text-xs text-neutral-500 uppercase">Drag Coeff (Cd) Puncak</div>
+                     <div className="font-mono text-neutral-200">{ballisticResult.telemetry.maxCd.toFixed(2)}</div>
+                   </div>
+                   <div className="text-right">
+                     <div className="text-xs text-neutral-500 uppercase">Jarak Tempuh Maksimum</div>
+                     <div className="font-mono text-orange-400">{(ballisticResult.maxDistance / 1000).toFixed(2)} km</div>
+                   </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-neutral-500 text-center py-8">Memuat data telemetri...</div>
+            )}
+            
+            <div className="mt-4 text-[10px] text-neutral-500 leading-relaxed border-t border-neutral-800 pt-3">
+              Catatan: Data telemetri ini diambil murni dari kalkulasi Runge-Kutta Orde 4 (RK4) untuk partikel lintasan utama (garis merah), yang mengasumsikan proyektil meluncur sempurna searah angin untuk menguji radius bahaya terjauh (Worst-Case Mitigation).
+            </div>
           </div>
         )}
       </div>
