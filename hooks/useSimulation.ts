@@ -14,6 +14,9 @@ export const KRAKATOA_PRESET: PhysicsParams = {
   stratosphericWindDir: 75,
   airDragEnabled: true,
   dragCoefficient: 0.47,
+  rockDensity: 2500,
+  surfaceTemp: 28, // Tropical surface temp
+  lapseRate: 6.5,
   lat: -6.102,
   lng: 105.423,
   elevation: 813, // meters
@@ -125,6 +128,36 @@ export const HISTORICAL_PRESETS = [
     params: { v0: 1500, angle: 85, mass: 5000, windSpeed: 15, windDirection: 90, windShearEnabled: true, stratosphericWindSpeed: 45, stratosphericWindDir: 100, airDragEnabled: true, dragCoefficient: 0.47, lat: -20.536, lng: -175.382, elevation: 114, projectileCount: 70 },
     aerosol: { days: 60, stratosphericWind: 50, lat: -20.536, lng: -175.382, diffusionRate: 300 }
   },
+  {
+    name: 'Mauna Loa (1984)',
+    description: 'Gunung berapi perisai terbesar di bumi. Letusan efusif menghasilkan aliran lava basaltik yang sangat panjang, minim ledakan abu vulkanik, namun gas vulkaniknya menyebar luas.',
+    params: { v0: 200, angle: 45, mass: 2000, windSpeed: 8, windDirection: 90, windShearEnabled: true, stratosphericWindSpeed: 10, stratosphericWindDir: 90, airDragEnabled: true, dragCoefficient: 0.5, lat: 19.475, lng: -155.608, elevation: 4169, projectileCount: 20 },
+    aerosol: { days: 10, stratosphericWind: 10, lat: 19.475, lng: -155.608, diffusionRate: 50 }
+  },
+  {
+    name: 'Chaitén (2008)',
+    description: 'Letusan riolitik pertama di dunia sejak seabad lalu (VEI 4). Menghasilkan tiang abu setinggi 30 km dan fenomena badai petir vulkanik yang luar biasa spektakuler.',
+    params: { v0: 650, angle: 85, mass: 1200, windSpeed: 12, windDirection: 270, windShearEnabled: true, stratosphericWindSpeed: 25, stratosphericWindDir: 260, airDragEnabled: true, dragCoefficient: 0.47, lat: -42.833, lng: -72.646, elevation: 1122, projectileCount: 45 },
+    aerosol: { days: 20, stratosphericWind: 25, lat: -42.833, lng: -72.646, diffusionRate: 150 }
+  },
+  {
+    name: 'Raikoke (2019)',
+    description: 'Letusan dahsyat (VEI 4) dari sebuah pulau tak berpenghuni di Rusia yang menyemburkan gas vulkanik dan aerosol melintasi Samudra Pasifik utara, yang terekam sangat jelas dari luar angkasa.',
+    params: { v0: 550, angle: 75, mass: 900, windSpeed: 15, windDirection: 315, windShearEnabled: true, stratosphericWindSpeed: 35, stratosphericWindDir: 300, airDragEnabled: true, dragCoefficient: 0.47, lat: 48.292, lng: 153.25, elevation: 551, projectileCount: 35 },
+    aerosol: { days: 15, stratosphericWind: 35, lat: 48.292, lng: 153.25, diffusionRate: 180 }
+  },
+  {
+    name: 'Semeru (2021)',
+    description: 'Letusan tragis akibat guguran kubah lava yang memicu serangkaian awan panas guguran masif (pyroclastic flows). Menyapu jembatan Gladak Perak dan beberapa desa di Besuk Kobokan.',
+    params: { v0: 350, angle: 40, mass: 600, windSpeed: 5, windDirection: 135, windShearEnabled: true, stratosphericWindSpeed: 15, stratosphericWindDir: 120, airDragEnabled: true, dragCoefficient: 0.47, lat: -8.108, lng: 112.92, elevation: 3676, projectileCount: 25 },
+    aerosol: { days: 5, stratosphericWind: 15, lat: -8.108, lng: 112.92, diffusionRate: 70 }
+  },
+  {
+    name: 'Sinabung (2014)',
+    description: 'Letusan berkelanjutan setelah lebih dari 400 tahun tertidur (VEI 4). Semburan debu vulkanik dan awan panas menutupi kawasan pertanian Karo, mengubah morfologi puncak gunung selamanya.',
+    params: { v0: 500, angle: 70, mass: 1000, windSpeed: 8, windDirection: 210, windShearEnabled: true, stratosphericWindSpeed: 20, stratosphericWindDir: 180, airDragEnabled: true, dragCoefficient: 0.47, lat: 3.17, lng: 98.392, elevation: 2460, projectileCount: 30 },
+    aerosol: { days: 12, stratosphericWind: 20, lat: 3.17, lng: 98.392, diffusionRate: 100 }
+  },
 ];
 
 export function useSimulation() {
@@ -136,7 +169,66 @@ export function useSimulation() {
   const [progressIndex, setProgressIndex] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   
-  const ballisticResult = useMemo(() => calculateEruption(params), [params]);
+  const [ballisticResult, setBallisticResult] = useState(() => calculateEruption(params));
+  const [isFetchingTopo, setIsFetchingTopo] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    // Debounce to prevent API spam while sliding parameters
+    const timer = setTimeout(async () => {
+      setIsFetchingTopo(true);
+      try {
+        // 1. Dry run (Flat Earth) to get coordinates
+        const dryRun = calculateEruption(params);
+        const trajectory = dryRun.primary.trajectory;
+
+        // 2. Sample points to fetch
+        const sampleSize = 80;
+        const step = Math.max(1, Math.floor(trajectory.length / sampleSize));
+        const sampled = [];
+        for (let i = 0; i < trajectory.length; i += step) {
+          sampled.push(trajectory[i]);
+          if (sampled.length >= sampleSize) break;
+        }
+        if (sampled[sampled.length - 1] !== trajectory[trajectory.length - 1]) {
+          sampled.push(trajectory[trajectory.length - 1]);
+        }
+
+        const lats = sampled.map(p => p.lat.toFixed(5)).join(',');
+        const lngs = sampled.map(p => p.lng.toFixed(5)).join(',');
+
+        // 3. Fetch from Open-Meteo
+        const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`);
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+
+        if (!isMounted) return;
+
+        if (data.elevation && data.elevation.length > 0) {
+          const topography = sampled.map((p, i) => ({
+            dist: p.x,
+            elev: Math.max(0, data.elevation[i] || 0)
+          }));
+          
+          // 4. Real run with topography
+          const realRun = calculateEruption(params, topography);
+          setBallisticResult(realRun);
+        } else {
+          setBallisticResult(dryRun);
+        }
+      } catch (e) {
+        console.error("Failed to fetch topography:", e);
+        if (isMounted) setBallisticResult(calculateEruption(params));
+      } finally {
+        if (isMounted) setIsFetchingTopo(false);
+      }
+    }, 600); // 600ms debounce
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [params]);
   
   // Keep aerosol location in sync with volcano selection, safely memoized
   const aerosolResult = useMemo(() => {
@@ -163,8 +255,8 @@ export function useSimulation() {
 
   // When params or mode change, reset animation
   useEffect(() => {
-    setProgressIndex(0);
-    setIsPlaying(false);
+    setTimeout(() => setProgressIndex(0), 0);
+    setTimeout(() => setIsPlaying(false), 0);
   }, [totalPoints, mode]);
 
   // Animation loop
@@ -185,7 +277,7 @@ export function useSimulation() {
       setProgressIndex((prev) => {
         const next = prev + (pointsPerMs * dt);
         if (next >= totalPoints - 1) {
-          setIsPlaying(false);
+          setTimeout(() => setIsPlaying(false), 0);
           return totalPoints - 1;
         }
         return next;
@@ -200,7 +292,7 @@ export function useSimulation() {
 
   const togglePlay = () => {
     if (!isPlaying && progressIndex >= totalPoints - 1) {
-      setProgressIndex(0);
+      setTimeout(() => setProgressIndex(0), 0);
     }
     setIsPlaying(!isPlaying);
   };
@@ -221,6 +313,7 @@ export function useSimulation() {
     isPlaying,
     togglePlay,
     playbackSpeed,
-    setPlaybackSpeed
+    setPlaybackSpeed,
+    isFetchingTopo,
   };
 }

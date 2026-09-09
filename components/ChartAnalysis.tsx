@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
 import { TrajectoryPoint, AshPoint, AcademicMetrics } from '@/utils/physics';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
-import { Target, Mountain, Clock, Globe, Wind, Zap, Flame, ThermometerSnowflake, Download, Table2, BarChart2, Calculator } from 'lucide-react';
+import { ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area, ReferenceDot } from 'recharts';
+import { Target, Mountain, Clock, Globe, Wind, Zap, Flame, ThermometerSnowflake, Download, Table2, BarChart2, TrendingUp, Calculator, MonitorPlay } from 'lucide-react';
 import { SimulationMode } from '@/hooks/useSimulation';
+import Projectile2DView from './Projectile2DView';
 
 interface Props {
   mode: SimulationMode;
@@ -26,7 +27,8 @@ interface Props {
 }
 
 export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, academicMetrics, progressIndex }: Props) {
-  const [viewMode, setViewMode] = useState<'chart' | 'table' | 'telemetry'>('chart');
+  const [viewMode, setViewMode] = useState<'chart_full' | 'chart_track' | 'table' | 'telemetry' | '2d_anim'>('chart_full');
+  const [trajectoryType, setTrajectoryType] = useState<'primary' | 'worstCase'>('primary');
   
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
@@ -54,99 +56,126 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
   
   if (mode === 'ballistic') {
     const maxPoints = 100;
-    const primaryTrajectory = ballisticResult.primary.trajectory;
-    const step = Math.max(1, Math.floor(primaryTrajectory.length / maxPoints));
+    const activeResult = trajectoryType === 'primary' ? ballisticResult.primary : ballisticResult.worstCase;
+    const activeTrajectory = activeResult.trajectory;
+    const step = Math.max(1, Math.floor(activeTrajectory.length / maxPoints));
     
-    const maxX = Number((ballisticResult.maxDistance / 1000).toFixed(2));
-    const maxY = Number((ballisticResult.maxHeight / 1000).toFixed(2));
-    const currentT = primaryTrajectory[Math.min(progressIndex, primaryTrajectory.length - 1)]?.t ?? 0;
+    const maxX = Number((activeResult.maxDistance / 1000).toFixed(2));
+    const maxY = Number((activeResult.maxHeight / 1000).toFixed(2));
+    const currentPointIndex = Math.min(progressIndex, activeTrajectory.length - 1);
+    const currentPoint = activeTrajectory[currentPointIndex];
 
-    const data = primaryTrajectory
-      .filter(p => p.t <= currentT)
+    const data = activeTrajectory
+      .filter((_, i) => viewMode !== 'chart_track' || i <= currentPointIndex)
       .filter((_, i, arr) => i % step === 0 || i === arr.length - 1)
       .map(p => ({
         x_km: Number((p.x / 1000).toFixed(2)),
         y_km: Number((p.y / 1000).toFixed(2)),
+        ground_km: Number(((p.groundElev || 0) / 1000).toFixed(2)),
         time: Number(p.t.toFixed(1)),
         vel: Number(p.v.toFixed(0)),
       }));
 
     return (
-      <div className="flex flex-col h-full bg-neutral-900 text-white rounded-xl overflow-hidden shadow-lg border border-neutral-800 p-4 relative">
+      <div className="flex flex-col h-full bg-neutral-900 text-white rounded-xl overflow-y-auto overflow-x-hidden shadow-lg border border-neutral-800 p-3 sm:p-4 relative">
         
-        {/* Header Actions */}
-        <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-          <div className="flex bg-neutral-800 rounded-lg p-1 border border-neutral-700">
-            <button onClick={() => setViewMode('telemetry')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'telemetry' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-white'}`} title="Perhitungan Langsung (Telemetri)">
-              <Calculator className="w-4 h-4" />
-            </button>
-            <button onClick={() => setViewMode('chart')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'chart' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`}>
-              <BarChart2 className="w-4 h-4" />
-            </button>
-            <button onClick={() => setViewMode('table')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`}>
-              <Table2 className="w-4 h-4" />
+        {/* Top Header Row (Metrics + Actions) */}
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-4 pb-4 border-b border-neutral-800/50">
+          {/* Academic Metrics Banner */}
+          <div className="grid grid-cols-3 lg:flex lg:flex-wrap items-center gap-2 sm:gap-6">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Tinggi Kolom (Plume)</span>
+              <div className="flex items-center gap-1.5 text-blue-400">
+                <Mountain className="w-4 h-4" />
+                <span className="font-mono text-sm">{academicMetrics.plumeHeightKm.toFixed(1)} km</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Mass Eruption Rate</span>
+              <div className="flex items-center gap-1.5 text-red-500">
+                <Flame className="w-4 h-4" />
+                <span className="font-mono text-sm">{academicMetrics.massEruptionRateKgS.toExponential(2)} kg/s</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Daya Ledak (TNT)</span>
+              <div className="flex items-center gap-1.5 text-orange-500">
+                <Zap className="w-4 h-4" />
+                <span className="font-mono text-sm text-white">{academicMetrics.megatonsTNT} MT</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Header Actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex bg-neutral-800 rounded-lg p-1 border border-neutral-700">
+              <button 
+                onClick={() => setTrajectoryType('primary')} 
+                className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-colors ${trajectoryType === 'primary' ? 'bg-orange-500/20 text-orange-400' : 'text-neutral-500 hover:text-neutral-300'}`}
+              >
+                Utama
+              </button>
+              <button 
+                onClick={() => setTrajectoryType('worstCase')} 
+                className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-colors ${trajectoryType === 'worstCase' ? 'bg-red-500/20 text-red-400' : 'text-neutral-500 hover:text-neutral-300'}`}
+              >
+                Terburuk
+              </button>
+            </div>
+            
+            <div className="flex bg-neutral-800 rounded-lg p-1 border border-neutral-700">
+              <button onClick={() => setViewMode('2d_anim')} className={`p-1.5 rounded-md transition-colors ${viewMode === '2d_anim' ? 'bg-neutral-700 text-green-400' : 'text-neutral-400 hover:text-white'}`} title="Animasi 2D Tracker">
+                <MonitorPlay className="w-4 h-4" />
+              </button>
+              <button onClick={() => setViewMode('telemetry')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'telemetry' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-white'}`} title="Perhitungan Langsung (Telemetri)">
+                <Calculator className="w-4 h-4" />
+              </button>
+              <button onClick={() => setViewMode('chart_track')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'chart_track' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`} title="Grafik Tracking Proyektil">
+                <TrendingUp className="w-4 h-4" />
+              </button>
+              <button onClick={() => setViewMode('chart_full')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'chart_full' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`} title="Grafik Keseluruhan Lintasan">
+                <BarChart2 className="w-4 h-4" />
+              </button>
+              <button onClick={() => setViewMode('table')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`} title="Tabel Data">
+                <Table2 className="w-4 h-4" />
+              </button>
+            </div>
+            <button onClick={handleExportCSV} className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-lg text-xs font-medium transition-colors">
+              <Download className="w-4 h-4" />
+              <span>CSV</span>
             </button>
           </div>
-          <button onClick={handleExportCSV} className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-lg text-xs font-medium transition-colors">
-            <Download className="w-4 h-4" />
-            <span>CSV</span>
-          </button>
         </div>
 
-        {/* Academic Metrics Banner */}
-        <div className="flex items-center gap-4 mb-4 pb-4 border-b border-neutral-800/50 pr-32">
-          <div className="flex-1 flex flex-col gap-1">
-            <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Tinggi Kolom (Plume)</span>
-            <div className="flex items-center gap-1.5 text-blue-400">
-              <Mountain className="w-4 h-4" />
-              <span className="font-mono text-sm">{academicMetrics.plumeHeightKm.toFixed(1)} km</span>
-            </div>
-          </div>
-          <div className="flex-1 flex flex-col gap-1">
-            <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Mass Eruption Rate</span>
-            <div className="flex items-center gap-1.5 text-red-500">
-              <Flame className="w-4 h-4" />
-              <span className="font-mono text-sm">{academicMetrics.massEruptionRateKgS.toExponential(2)} kg/s</span>
-            </div>
-          </div>
-          <div className="flex-1 flex flex-col gap-1">
-            <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Daya Ledak (TNT)</span>
-            <div className="flex items-center gap-1.5 text-orange-500">
-              <Zap className="w-4 h-4" />
-              <span className="font-mono text-sm text-white">{academicMetrics.megatonsTNT} MT</span>
-            </div>
-          </div>
-        </div>
-
-        {viewMode === 'chart' ? (
+        {viewMode.startsWith('chart') ? (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-              <div className="flex items-center gap-3 bg-neutral-800/50 px-4 py-2 rounded-lg border border-neutral-700/50">
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-3 bg-neutral-800/50 p-2 sm:px-4 sm:py-2 rounded-lg border border-neutral-700/50 text-center sm:text-left">
                 <Target className="w-5 h-5 text-orange-500" />
                 <div>
-                  <div className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">Jarak Maksimum</div>
-                  <div className="text-lg font-bold">{(ballisticResult.maxDistance / 1000).toFixed(2)} <span className="text-sm font-normal text-neutral-400">km</span></div>
+                  <div className="text-[8px] sm:text-[10px] text-neutral-400 font-medium uppercase tracking-wider leading-tight">Jarak Maksimum</div>
+                  <div className="text-sm sm:text-lg font-bold mt-1 sm:mt-0">{(activeResult.maxDistance / 1000).toFixed(2)} <span className="text-sm font-normal text-neutral-400">km</span></div>
                 </div>
               </div>
-              <div className="flex items-center gap-3 bg-neutral-800/50 px-4 py-2 rounded-lg border border-neutral-700/50">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-3 bg-neutral-800/50 p-2 sm:px-4 sm:py-2 rounded-lg border border-neutral-700/50 text-center sm:text-left">
                 <Mountain className="w-5 h-5 text-blue-500" />
                 <div>
-                  <div className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">Ketinggian Apex</div>
-                  <div className="text-lg font-bold">{(ballisticResult.maxHeight / 1000).toFixed(2)} <span className="text-sm font-normal text-neutral-400">km</span></div>
+                  <div className="text-[8px] sm:text-[10px] text-neutral-400 font-medium uppercase tracking-wider leading-tight">Ketinggian Apex</div>
+                  <div className="text-sm sm:text-lg font-bold mt-1 sm:mt-0">{(activeResult.maxHeight / 1000).toFixed(2)} <span className="text-sm font-normal text-neutral-400">km</span></div>
                 </div>
               </div>
-              <div className="flex items-center gap-3 bg-neutral-800/50 px-4 py-2 rounded-lg border border-neutral-700/50">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-3 bg-neutral-800/50 p-2 sm:px-4 sm:py-2 rounded-lg border border-neutral-700/50 text-center sm:text-left">
                 <Clock className="w-5 h-5 text-green-500" />
                 <div>
-                  <div className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">Lama Terbang</div>
-                  <div className="text-lg font-bold">{ballisticResult.timeOfFlight.toFixed(1)} <span className="text-sm font-normal text-neutral-400">s</span></div>
+                  <div className="text-[8px] sm:text-[10px] text-neutral-400 font-medium uppercase tracking-wider leading-tight">Lama Terbang</div>
+                  <div className="text-sm sm:text-lg font-bold mt-1 sm:mt-0">{activeResult.timeOfFlight.toFixed(1)} <span className="text-sm font-normal text-neutral-400">s</span></div>
                 </div>
               </div>
             </div>
 
-            <div className="flex-1 min-h-[150px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 0 }}>
+            <div className="w-full h-[250px] sm:h-[300px] md:h-auto md:flex-1 mt-2">
+              <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                <ComposedChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                   <XAxis type="number" dataKey="x_km" domain={[0, maxX]} stroke="#666" tick={{ fill: '#888', fontSize: 11 }} tickFormatter={(val) => `${Number(val.toFixed(1))} km`} />
                   <YAxis width={65} type="number" domain={[0, maxY * 1.1]} stroke="#666" tick={{ fill: '#888', fontSize: 11 }} tickFormatter={(val) => `${Number(val.toFixed(1))} km`} />
@@ -154,19 +183,33 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
                     contentStyle={{ backgroundColor: '#171717', borderColor: '#333', borderRadius: '8px', fontSize: '12px' }}
                     itemStyle={{ color: '#f97316' }}
                     labelStyle={{ color: '#888', marginBottom: '4px' }}
-                    formatter={(value: any, name: any) => [
-                      `${value} ${name === 'y_km' ? 'km' : (name === 'vel' ? 'm/s' : '')}`,
-                      name === 'y_km' ? 'Ketinggian' : (name === 'vel' ? 'Kecepatan' : name)
-                    ]}
+                    formatter={(value: any, name: any) => {
+                      if (name === 'y_km') return [`${value} km`, 'Ketinggian Proyektil'];
+                      if (name === 'ground_km') return [`${value} km`, 'Elevasi Tanah Asli'];
+                      if (name === 'vel') return [`${value} m/s`, 'Kecepatan'];
+                      return [`${value}`, name];
+                    }}
                     labelFormatter={(label) => `Jarak: ${label} km`}
                   />
+                  <Area isAnimationActive={false} type="step" dataKey="ground_km" stroke="#4ade80" fill="#4ade80" fillOpacity={0.15} strokeWidth={1} />
                   <Line isAnimationActive={false} type="monotone" dataKey="y_km" stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#f97316', stroke: '#fff' }} />
-                </LineChart>
+                  {currentPoint && (
+                    <ReferenceDot 
+                      x={Number((currentPoint.x / 1000).toFixed(2))} 
+                      y={Number((currentPoint.y / 1000).toFixed(2))} 
+                      r={6} fill="#ef4444" stroke="#fff" strokeWidth={2}
+                    />
+                  )}
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </>
+        ) : viewMode === '2d_anim' ? (
+          <div className="w-full h-[250px] sm:h-[300px] md:h-auto md:flex-1 mt-2">
+            <Projectile2DView trajectory={activeTrajectory} progressIndex={progressIndex} />
+          </div>
         ) : viewMode === 'table' ? (
-          <div className="flex-1 overflow-auto border border-neutral-800 rounded-lg">
+          <div className="w-full h-[250px] sm:h-[300px] md:h-auto md:flex-1 overflow-auto border border-neutral-800 rounded-lg mt-2">
             <table className="w-full text-left text-xs text-neutral-400">
               <thead className="bg-neutral-800/50 text-neutral-300 sticky top-0 uppercase font-medium">
                 <tr>
@@ -179,7 +222,7 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
                 </tr>
               </thead>
               <tbody>
-                {primaryTrajectory.slice(0, progressIndex + 1).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length/100)) === 0 || i === arr.length - 1).map((p, idx) => (
+                {activeTrajectory.slice(0, progressIndex + 1).filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length/100)) === 0 || i === arr.length - 1).map((p, idx) => (
                   <tr key={idx} className="border-b border-neutral-800/50 hover:bg-neutral-800/30">
                     <td className="px-4 py-1.5">{p.t.toFixed(1)}</td>
                     <td className="px-4 py-1.5 text-orange-400">{(p.x/1000).toFixed(2)}</td>
@@ -194,93 +237,98 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
           </div>
         ) : (
           <div className="flex-1 overflow-auto p-4 bg-neutral-950/50 rounded-lg border border-neutral-800 text-sm">
-            <h3 className="text-orange-400 font-semibold mb-4 flex items-center gap-2">
-              <Calculator className="w-4 h-4" /> Log Perhitungan Saintifik (Skenario Terburuk / Garis Hijau)
-            </h3>
             
-            {ballisticResult.telemetry ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
-                {/* Massa & Radius Benda */}
-                <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
-                  <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Radius Proyektil (r)</div>
-                  <div className="font-mono text-[10px] text-blue-300 mb-1">
-                    r = (m / (ρ_rock * 4/3 * π))^(1/3)
-                  </div>
-                  <div className="font-mono text-[10px] text-neutral-400 mb-2">
-                    r = ({ballisticResult.telemetry.mass.toFixed(1)} / ({ballisticResult.telemetry.rockDensity} * 1.333 * 3.14))^(1/3)
-                  </div>
-                  <div className="font-mono text-sm text-neutral-200">
-                    r = {ballisticResult.telemetry.radius.toFixed(3)} m
-                  </div>
-                </div>
+            <div className="flex flex-col gap-6">
+              {/* UTAMA (Merah) */}
+              {ballisticResult.primary?.telemetry && (
+                <div>
+                  <h3 className="text-red-400 font-semibold mb-3 flex items-center gap-2 border-b border-red-500/30 pb-2">
+                    <Calculator className="w-4 h-4" /> Utama (Garis Merah)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Massa & Radius Benda */}
+                    <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
+                      <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Radius Proyektil (r)</div>
+                      <div className="font-mono text-[10px] text-blue-300 mb-1">r = (m / (ρ_rock * 4/3 * π))^(1/3)</div>
+                      <div className="font-mono text-[10px] text-neutral-400 mb-2">r = ({ballisticResult.primary.telemetry.mass.toFixed(1)} / ({ballisticResult.primary.telemetry.rockDensity} * 1.333 * 3.14))^(1/3)</div>
+                      <div className="font-mono text-sm text-neutral-200">r = {ballisticResult.primary.telemetry.radius.toFixed(3)} m</div>
+                    </div>
 
-                {/* Initial Mach Number */}
-                <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
-                  <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Mach Number Awal (M)</div>
-                  <div className="font-mono text-[10px] text-blue-300 mb-1">
-                    M = V0 / a_initial
-                  </div>
-                  <div className="font-mono text-[10px] text-neutral-400 mb-2">
-                    M = {ballisticResult.telemetry.launchVelocity.toFixed(1)} / {ballisticResult.telemetry.initialA.toFixed(1)}
-                  </div>
-                  <div className="font-mono text-sm text-neutral-200">
-                    M = {(ballisticResult.telemetry.launchVelocity / ballisticResult.telemetry.initialA).toFixed(3)}
-                  </div>
-                  <div className="text-[9px] text-orange-400 mt-1">Status: {(ballisticResult.telemetry.launchVelocity / ballisticResult.telemetry.initialA) > 1.0 ? 'Supersonic (Shockwave Drag)' : 'Subsonic'}</div>
-                </div>
+                    {/* Initial Mach Number */}
+                    <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
+                      <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Mach Number Awal (M)</div>
+                      <div className="font-mono text-[10px] text-blue-300 mb-1">M = V0 / a_initial<br/>a = √(γ·R·T₀)</div>
+                      <div className="font-mono text-[10px] text-neutral-400 mb-2">M = {ballisticResult.primary.telemetry.launchVelocity.toFixed(1)} / {ballisticResult.primary.telemetry.initialA.toFixed(1)}</div>
+                      <div className="font-mono text-sm text-neutral-200">M = {(ballisticResult.primary.telemetry.launchVelocity / ballisticResult.primary.telemetry.initialA).toFixed(3)}</div>
+                      <div className="text-[9px] text-red-400 mt-1">Status: {(ballisticResult.primary.telemetry.launchVelocity / ballisticResult.primary.telemetry.initialA) > 1.0 ? 'Supersonic (Shockwave Drag)' : 'Subsonic'}</div>
+                    </div>
 
-                {/* Gaya Hambat Udara (Drag) */}
-                <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
-                  <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Gaya Hambat Awal (F_drag)</div>
-                  <div className="font-mono text-[10px] text-blue-300 mb-1">
-                    F_drag = ½ * ρ * V0² * Cd * A
-                  </div>
-                  <div className="font-mono text-[10px] text-neutral-400 mb-2">
-                    F_drag = 0.5 * {ballisticResult.telemetry.initialRho.toFixed(3)} * {Math.pow(ballisticResult.telemetry.launchVelocity, 2).toFixed(1)} * {ballisticResult.telemetry.baseCd} * {(Math.PI * Math.pow(ballisticResult.telemetry.radius, 2)).toFixed(3)}
-                  </div>
-                  <div className="font-mono text-sm text-neutral-200">
-                    F_drag = {((0.5 * ballisticResult.telemetry.initialRho * Math.pow(ballisticResult.telemetry.launchVelocity, 2) * ballisticResult.telemetry.baseCd * (Math.PI * Math.pow(ballisticResult.telemetry.radius, 2))) / 1000).toFixed(2)} kN
-                  </div>
-                </div>
+                    {/* Gaya Hambat Udara (Drag) */}
+                    <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
+                      <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Gaya Hambat Awal (F_drag)</div>
+                      <div className="font-mono text-[10px] text-blue-300 mb-1">F_drag = ½ * ρ * V0² * Cd * A</div>
+                      <div className="font-mono text-[10px] text-neutral-400 mb-2">F_drag = 0.5 * {ballisticResult.primary.telemetry.initialRho.toFixed(3)} * {Math.pow(ballisticResult.primary.telemetry.launchVelocity, 2).toFixed(1)} * {ballisticResult.primary.telemetry.baseCd} * {(Math.PI * Math.pow(ballisticResult.primary.telemetry.radius, 2)).toFixed(3)}</div>
+                      <div className="font-mono text-sm text-neutral-200">F_drag = {((0.5 * ballisticResult.primary.telemetry.initialRho * Math.pow(ballisticResult.primary.telemetry.launchVelocity, 2) * ballisticResult.primary.telemetry.baseCd * (Math.PI * Math.pow(ballisticResult.primary.telemetry.radius, 2))) / 1000).toFixed(2)} kN</div>
+                    </div>
 
-                {/* Parameter Coriolis */}
-                <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
-                  <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Parameter Coriolis (f)</div>
-                  <div className="font-mono text-[10px] text-blue-300 mb-1">
-                    f = 2 * Ω * sin(latitude)
+                    {/* Parameter Coriolis */}
+                    <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
+                      <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Parameter Coriolis (f)</div>
+                      <div className="font-mono text-[10px] text-blue-300 mb-1">f = 2 * Ω * sin(latitude)</div>
+                      <div className="font-mono text-[10px] text-neutral-400 mb-2">f = 2 * 0.000072921 * sin(lat_rad)</div>
+                      <div className="font-mono text-sm text-neutral-200">f = {ballisticResult.primary.telemetry.coriolisF.toExponential(4)} s⁻¹</div>
+                      <div className="text-[9px] text-red-400 mt-1">Membelokkan partikel ke {(ballisticResult.primary.telemetry.coriolisF > 0) ? 'Kanan (Belahan Bumi Utara)' : (ballisticResult.primary.telemetry.coriolisF < 0) ? 'Kiri (Belahan Bumi Selatan)' : 'Nihil (Ekuator)'}</div>
+                    </div>
                   </div>
-                  <div className="font-mono text-[10px] text-neutral-400 mb-2">
-                    f = 2 * 0.000072921 * sin(lat_rad)
-                  </div>
-                  <div className="font-mono text-sm text-neutral-200">
-                    f = {ballisticResult.telemetry.coriolisF.toExponential(4)} s⁻¹
-                  </div>
-                  <div className="text-[9px] text-orange-400 mt-1">Membelokkan partikel ke {(ballisticResult.telemetry.coriolisF > 0) ? 'Kanan (Belahan Bumi Utara)' : (ballisticResult.telemetry.coriolisF < 0) ? 'Kiri (Belahan Bumi Selatan)' : 'Nihil (Ekuator)'}</div>
                 </div>
-                
-                {/* Max Values Info */}
-                <div className="p-3 bg-neutral-900 rounded border border-neutral-800 md:col-span-2 flex justify-between items-center">
-                   <div>
-                     <div className="text-xs text-neutral-500 uppercase">Mach Number Puncak (Sepanjang Trajektori)</div>
-                     <div className="font-mono text-neutral-200">M {ballisticResult.telemetry.maxMach.toFixed(2)}</div>
-                   </div>
-                   <div className="text-right">
-                     <div className="text-xs text-neutral-500 uppercase">Drag Coeff (Cd) Puncak</div>
-                     <div className="font-mono text-neutral-200">{ballisticResult.telemetry.maxCd.toFixed(2)}</div>
-                   </div>
-                   <div className="text-right">
-                     <div className="text-xs text-neutral-500 uppercase">Jarak Tempuh Maksimum</div>
-                     <div className="font-mono text-orange-400">{(ballisticResult.maxDistance / 1000).toFixed(2)} km</div>
-                   </div>
+              )}
+
+              {/* WORST CASE (Hijau) */}
+              {ballisticResult.worstCase?.telemetry && (
+                <div>
+                  <h3 className="text-green-500 font-semibold mb-3 mt-4 flex items-center gap-2 border-b border-green-500/30 pb-2">
+                    <Calculator className="w-4 h-4" /> Skenario Terburuk (Garis Hijau)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Massa & Radius Benda */}
+                    <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
+                      <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Radius Proyektil (r)</div>
+                      <div className="font-mono text-[10px] text-blue-300 mb-1">r = (m / (ρ_rock * 4/3 * π))^(1/3)</div>
+                      <div className="font-mono text-[10px] text-neutral-400 mb-2">r = ({ballisticResult.worstCase.telemetry.mass.toFixed(1)} / ({ballisticResult.worstCase.telemetry.rockDensity} * 1.333 * 3.14))^(1/3)</div>
+                      <div className="font-mono text-sm text-neutral-200">r = {ballisticResult.worstCase.telemetry.radius.toFixed(3)} m</div>
+                    </div>
+
+                    {/* Initial Mach Number */}
+                    <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
+                      <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Mach Number Awal (M)</div>
+                      <div className="font-mono text-[10px] text-blue-300 mb-1">M = V0 / a_initial<br/>a = √(γ·R·T₀)</div>
+                      <div className="font-mono text-[10px] text-neutral-400 mb-2">M = {ballisticResult.worstCase.telemetry.launchVelocity.toFixed(1)} / {ballisticResult.worstCase.telemetry.initialA.toFixed(1)}</div>
+                      <div className="font-mono text-sm text-neutral-200">M = {(ballisticResult.worstCase.telemetry.launchVelocity / ballisticResult.worstCase.telemetry.initialA).toFixed(3)}</div>
+                      <div className="text-[9px] text-green-500 mt-1">Status: {(ballisticResult.worstCase.telemetry.launchVelocity / ballisticResult.worstCase.telemetry.initialA) > 1.0 ? 'Supersonic (Shockwave Drag)' : 'Subsonic'}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Max Values Info */}
+              <div className="p-3 bg-neutral-900 rounded border border-neutral-800 flex justify-between items-center mt-2"> 
+                <div>
+                  <div className="text-xs text-neutral-500 uppercase">Mach Number Puncak</div>
+                  <div className="font-mono text-neutral-200">M {Math.max(ballisticResult.worstCase?.telemetry?.maxMach || 0, ballisticResult.primary?.telemetry?.maxMach || 0).toFixed(2)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-neutral-500 uppercase">Drag Coeff (Cd) Puncak</div>
+                  <div className="font-mono text-neutral-200">{Math.max(ballisticResult.worstCase?.telemetry?.maxCd || 0, ballisticResult.primary?.telemetry?.maxCd || 0).toFixed(2)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-neutral-500 uppercase">Jarak Tempuh Maks (Worst Case)</div>
+                  <div className="font-mono text-orange-400">{(ballisticResult.maxDistance / 1000).toFixed(2)} km</div>
                 </div>
               </div>
-            ) : (
-              <div className="text-neutral-500 text-center py-8">Memuat data telemetri...</div>
-            )}
-            
-            <div className="mt-4 text-[10px] text-neutral-500 leading-relaxed border-t border-neutral-800 pt-3">
-              Catatan: Data telemetri ini diambil murni dari kalkulasi Runge-Kutta Orde 4 (RK4) untuk partikel lintasan utama (garis merah), yang mengasumsikan proyektil meluncur sempurna searah angin untuk menguji radius bahaya terjauh (Worst-Case Mitigation).
+
+              <div className="text-[10px] text-neutral-500 leading-relaxed border-t border-neutral-800 pt-3">
+                Catatan: Data telemetri ini diambil murni dari kalkulasi Runge-Kutta Orde 4 (RK4) untuk partikel lintasan utama (merah) dan partikel terjauh/worst-case (hijau) yang menyebar.
+              </div>
             </div>
           </div>
         )}
@@ -289,8 +337,11 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
   }
 
   // AEROSOL MODE
+  const currentAerosolPointIndex = Math.min(progressIndex, aerosolResult.trajectory.length - 1);
+  const currentAerosolPoint = aerosolResult.trajectory[currentAerosolPointIndex];
+
   const aerosolData = aerosolResult.trajectory
-    .filter((_, i) => i <= progressIndex)
+    .filter((_, i) => viewMode !== 'chart_track' || i <= currentAerosolPointIndex)
     .map((p) => ({
       day: Number(p.day.toFixed(1)),
       dist: Number(p.distanceKm.toFixed(0)),
@@ -301,71 +352,78 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
   const maxAerosolDist = aerosolResult.maxDistance;
 
   return (
-    <div className="flex flex-col h-full bg-neutral-900 text-white rounded-xl overflow-hidden shadow-lg border border-neutral-800 p-4 relative">
+    <div className="flex flex-col h-full bg-neutral-900 text-white rounded-xl overflow-y-auto overflow-x-hidden shadow-lg border border-neutral-800 p-3 sm:p-4 relative">
       
-      {/* Header Actions */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-        <div className="flex bg-neutral-800 rounded-lg p-1 border border-neutral-700">
-          <button onClick={() => setViewMode('chart')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'chart' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`}>
-            <BarChart2 className="w-4 h-4" />
-          </button>
-          <button onClick={() => setViewMode('table')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`}>
-            <Table2 className="w-4 h-4" />
+      {/* Top Header Row (Metrics + Actions) */}
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-4 pb-4 border-b border-neutral-800/50">
+        
+        {/* Academic Metrics Banner (Climate) */}
+        <div className="grid grid-cols-3 lg:flex lg:flex-wrap items-center gap-2 sm:gap-6">
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Skala VEI Erupsi</span>
+            <div className="flex items-center gap-1.5 text-orange-500">
+              <Mountain className="w-4 h-4" />
+              <span className="font-mono text-sm text-white">VEI {academicMetrics.vei}</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Penurunan Suhu Global</span>
+            <div className="flex items-center gap-1.5 text-blue-400">
+              <ThermometerSnowflake className="w-4 h-4" />
+              <span className="font-mono text-sm">-{academicMetrics.globalCoolingC}°C</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Total Massa Ejekta</span>
+            <div className="flex items-center gap-1.5 text-gray-400">
+              <Globe className="w-4 h-4" />
+              <span className="font-mono text-sm">{academicMetrics.totalMassKg.toExponential(2)} kg</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Header Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex bg-neutral-800 rounded-lg p-1 border border-neutral-700">
+            <button onClick={() => setViewMode('chart_track')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'chart_track' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`} title="Grafik Tracking">
+              <TrendingUp className="w-4 h-4" />
+            </button>
+            <button onClick={() => setViewMode('chart_full')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'chart_full' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`} title="Grafik Keseluruhan">
+              <BarChart2 className="w-4 h-4" />
+            </button>
+            <button onClick={() => setViewMode('table')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-white'}`} title="Tabel Data">
+              <Table2 className="w-4 h-4" />
+            </button>
+          </div>
+          <button onClick={handleExportCSV} className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-lg text-xs font-medium transition-colors">
+            <Download className="w-4 h-4" />
+            <span>CSV</span>
           </button>
         </div>
-        <button onClick={handleExportCSV} className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-lg text-xs font-medium transition-colors">
-          <Download className="w-4 h-4" />
-          <span>CSV</span>
-        </button>
       </div>
 
-      {/* Academic Metrics Banner (Climate) */}
-      <div className="flex items-center gap-4 mb-4 pb-4 border-b border-neutral-800/50 pr-32">
-        <div className="flex-1 flex flex-col gap-1">
-          <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Skala VEI Erupsi</span>
-          <div className="flex items-center gap-1.5 text-orange-500">
-            <Mountain className="w-4 h-4" />
-            <span className="font-mono text-sm text-white">VEI {academicMetrics.vei}</span>
-          </div>
-        </div>
-        <div className="flex-1 flex flex-col gap-1">
-          <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Penurunan Suhu Global</span>
-          <div className="flex items-center gap-1.5 text-blue-400">
-            <ThermometerSnowflake className="w-4 h-4" />
-            <span className="font-mono text-sm">-{academicMetrics.globalCoolingC}°C</span>
-          </div>
-        </div>
-        <div className="flex-1 flex flex-col gap-1">
-          <span className="text-[10px] text-neutral-400 font-medium uppercase tracking-widest">Total Massa Ejekta</span>
-          <div className="flex items-center gap-1.5 text-gray-400">
-            <Globe className="w-4 h-4" />
-            <span className="font-mono text-sm">{academicMetrics.totalMassKg.toExponential(2)} kg</span>
-          </div>
-        </div>
-      </div>
-
-      {viewMode === 'chart' ? (
+      {viewMode.startsWith('chart') ? (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3 bg-neutral-800/50 px-4 py-2 rounded-lg border border-neutral-700/50">
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-3 bg-neutral-800/50 p-2 sm:px-4 sm:py-2 rounded-lg border border-neutral-700/50 text-center sm:text-left">
               <Globe className="w-5 h-5 text-purple-500" />
               <div>
-                <div className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">Jarak Tempuh Global</div>
-                <div className="text-lg font-bold">{(aerosolResult.maxDistance).toFixed(0)} <span className="text-sm font-normal text-neutral-400">km</span></div>
+                <div className="text-[8px] sm:text-[10px] text-neutral-400 font-medium uppercase tracking-wider leading-tight">Jarak Tempuh Global</div>
+                <div className="text-sm sm:text-lg font-bold mt-1 sm:mt-0">{(aerosolResult.maxDistance).toFixed(0)} <span className="text-sm font-normal text-neutral-400">km</span></div>
               </div>
             </div>
-            <div className="flex items-center gap-3 bg-neutral-800/50 px-4 py-2 rounded-lg border border-neutral-700/50">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-3 bg-neutral-800/50 p-2 sm:px-4 sm:py-2 rounded-lg border border-neutral-700/50 text-center sm:text-left">
               <Wind className="w-5 h-5 text-gray-400" />
               <div>
-                <div className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">Maks Radius Sebaran</div>
-                <div className="text-lg font-bold">{(aerosolResult.maxRadius).toFixed(0)} <span className="text-sm font-normal text-neutral-400">km</span></div>
+                <div className="text-[8px] sm:text-[10px] text-neutral-400 font-medium uppercase tracking-wider leading-tight">Maks Radius Sebaran</div>
+                <div className="text-sm sm:text-lg font-bold mt-1 sm:mt-0">{(aerosolResult.maxRadius).toFixed(0)} <span className="text-sm font-normal text-neutral-400">km</span></div>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 min-h-[150px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={aerosolData} margin={{ top: 5, right: 20, left: 10, bottom: 0 }}>
+          <div className="w-full h-[250px] sm:h-[300px] md:h-auto md:flex-1 mt-2">
+            <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+              <ComposedChart data={aerosolData} margin={{ top: 5, right: 20, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                 <XAxis type="number" dataKey="day" domain={[0, maxDays]} stroke="#666" tick={{ fill: '#888', fontSize: 11 }} tickFormatter={(val) => `Hari ${Number(val.toFixed(1))}`} />
                 <YAxis width={65} type="number" domain={[0, maxAerosolDist * 1.1]} stroke="#666" tick={{ fill: '#888', fontSize: 11 }} tickFormatter={(val) => `${Number(val.toFixed(0))} km`} />
@@ -377,12 +435,19 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
                   labelFormatter={(label) => `Hari ke-${label}`}
                 />
                 <Area isAnimationActive={false} type="monotone" dataKey="dist" stroke="#a855f7" fill="#a855f7" fillOpacity={0.2} strokeWidth={2} />
-              </AreaChart>
+                {currentAerosolPoint && (
+                  <ReferenceDot 
+                    x={Number(currentAerosolPoint.day.toFixed(1))} 
+                    y={Number(currentAerosolPoint.distanceKm.toFixed(0))} 
+                    r={6} fill="#a855f7" stroke="#fff" strokeWidth={2}
+                  />
+                )}
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </>
       ) : (
-        <div className="flex-1 overflow-auto border border-neutral-800 rounded-lg">
+        <div className="w-full h-[250px] sm:h-[300px] md:h-auto md:flex-1 overflow-auto border border-neutral-800 rounded-lg mt-2">
           <table className="w-full text-left text-xs text-neutral-400">
             <thead className="bg-neutral-800/50 text-neutral-300 sticky top-0 uppercase font-medium">
               <tr>

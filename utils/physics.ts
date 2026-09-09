@@ -15,11 +15,33 @@ export interface PhysicsParams {
   stratosphericWindDir: number; // degrees
   airDragEnabled: boolean;
   dragCoefficient: number; // 0.1 to 1.0 (Base Subsonic Cd)
+  rockDensity?: number; // kg/m3 (e.g. 500 for Pumice, 2800 for Basalt)
+  surfaceTemp?: number; // Celcius (default 15)
+  lapseRate?: number; // K/km (default 6.5)
   lat: number;
   lng: number;
   elevation: number; // meters
   projectileCount: number;
   launchAzimuth?: number; // Explicit launch direction (0-360 compass). If undefined, defaults to windDirection for max-range calculation.
+}
+
+export interface TopoPoint {
+  dist: number;
+  elev: number;
+}
+
+export function getGroundElev(x: number, topo?: TopoPoint[]): number {
+  if (!topo || topo.length === 0) return 0;
+  if (x <= topo[0].dist) return topo[0].elev;
+  if (x >= topo[topo.length - 1].dist) return topo[topo.length - 1].elev;
+  
+  for (let i = 0; i < topo.length - 1; i++) {
+    if (x >= topo[i].dist && x <= topo[i + 1].dist) {
+      const t = (x - topo[i].dist) / (topo[i + 1].dist - topo[i].dist);
+      return topo[i].elev + t * (topo[i + 1].elev - topo[i].elev);
+    }
+  }
+  return 0;
 }
 
 export interface TrajectoryPoint {
@@ -29,6 +51,7 @@ export interface TrajectoryPoint {
   v: number;
   lat: number;
   lng: number;
+  groundElev?: number;
 }
 
 // Return type of calculateTrajectory
@@ -56,32 +79,36 @@ export interface TrajectoryResult {
 
 // US Standard Atmosphere 1976 Model
 // Calculates Temperature (K), Density (kg/m3), and Speed of Sound (m/s) based on Altitude (m)
-function getAtmosphericProperties(z: number) {
+function getAtmosphericProperties(z: number, customTempC = 15, customLapseKkm = 6.5) {
   let T: number, P: number, rho: number;
   const g0 = 9.80665;
   const M = 0.0289644; // Molar mass of Earth's air
   const R = 8.31432; // Universal gas constant
   
+  const T0 = customTempC + 273.15;
+  const P0 = 101325;
+  const L = -(customLapseKkm / 1000); // Lapse rate (K/m)
+
   if (z < 11000) {
     // Troposphere
-    const T0 = 288.15;
-    const P0 = 101325;
-    const L = -0.0065; // Lapse rate (K/m)
     T = T0 + L * z;
     P = P0 * Math.pow(T / T0, (-g0 * M) / (R * L));
   } else if (z < 20000) {
     // Tropopause (Isothermal layer)
-    const T11 = 216.65;
-    const P11 = 22632.1;
+    const T11 = T0 + L * 11000;
+    const P11 = P0 * Math.pow(T11 / T0, (-g0 * M) / (R * L));
     T = T11;
     P = P11 * Math.exp((-g0 * M * (z - 11000)) / (R * T));
   } else {
     // Stratosphere
-    const T20 = 216.65;
-    const P20 = 5474.89;
-    const L = 0.001; // Temp increases in stratosphere
-    T = T20 + L * (z - 20000);
-    P = P20 * Math.pow(T / T20, (-g0 * M) / (R * L));
+    const T11 = T0 + L * 11000;
+    const P11 = P0 * Math.pow(T11 / T0, (-g0 * M) / (R * L));
+    const T20 = T11;
+    const P20 = P11 * Math.exp((-g0 * M * (20000 - 11000)) / (R * T20));
+    
+    const L_strato = 0.001; // Temp increases in stratosphere
+    T = T20 + L_strato * (z - 20000);
+    P = P20 * Math.pow(T / T20, (-g0 * M) / (R * L_strato));
   }
   
   rho = (P * M) / (R * T);
@@ -105,7 +132,7 @@ function getMachDependentDrag(baseCd: number, machNumber: number): number {
   return 1.2 - 0.2 * Math.min(1, (machNumber - 1.2) / 3.0);
 }
 
-export function calculateTrajectory(params: PhysicsParams): TrajectoryResult {
+export function calculateTrajectory(params: PhysicsParams, topography?: TopoPoint[]): TrajectoryResult {
   const { v0, angle, mass, windSpeed, windDirection, windShearEnabled, stratosphericWindSpeed, stratosphericWindDir, airDragEnabled, dragCoefficient, lat, lng, elevation } = params;
   
   const theta = (angle * Math.PI) / 180;
@@ -121,7 +148,7 @@ export function calculateTrajectory(params: PhysicsParams): TrajectoryResult {
   const trueWindAzimuthMath = ((90 - params.windDirection) * Math.PI) / 180; // Wind is ALWAYS the global wind direction
 
   const baseCd = dragCoefficient ?? 0.47; 
-  const rockDensity = 2500; // Basaltic/Andesitic density kg/m3
+  const rockDensity = params.rockDensity ?? 2500; // Basaltic/Andesitic density kg/m3 by default
   const radius = Math.cbrt((mass / rockDensity) / ((4 / 3) * Math.PI));
   const A = Math.PI * radius * radius;
   
@@ -176,7 +203,7 @@ export function calculateTrajectory(params: PhysicsParams): TrajectoryResult {
       wN = currentWindSpeed * Math.sin(trueWindAzimuthMath);
     }
     
-    const { rho, a } = getAtmosphericProperties(Math.max(0, currZ));
+    const { rho, a } = getAtmosphericProperties(Math.max(0, currZ), params.surfaceTemp, params.lapseRate);
     
     const v_rel_E = currVE - wE;
     const v_rel_N = currVN - wN;
@@ -202,14 +229,24 @@ export function calculateTrajectory(params: PhysicsParams): TrajectoryResult {
     return [currVE, currVN, currVZ, aE, aN, aZ];
   };
 
-  while (state[2] >= 0 && t < 20000) { // state[2] is z
+  // Loop until it hits the ground (or sea level)
+  while (t < 20000) { // Timeout after ~5 hours
+    const currentX = Math.sqrt(state[0] ** 2 + state[1] ** 2);
+    const groundElev = getGroundElev(currentX, topography);
+    
+    // Check ground collision (only break if it has moved a bit, to prevent instant collision at launch)
+    if (t > 0.5 && state[2] <= groundElev) {
+      break;
+    }
+
     trajectory.push({
-      x: Math.sqrt(state[0] ** 2 + state[1] ** 2),
+      x: currentX,
       y: Math.max(0, state[2]),
       t,
       v: Math.sqrt(state[3] ** 2 + state[4] ** 2 + state[5] ** 2),
       lat: lat + state[1] / (kmPerLat * 1000),
       lng: lng + state[0] / (kmPerLng * 1000),
+      groundElev: groundElev,
     });
     
     if (state[2] > maxHeight) maxHeight = state[2];
@@ -230,27 +267,32 @@ export function calculateTrajectory(params: PhysicsParams): TrajectoryResult {
   // Exact Ground Intersection (Interpolation)
   if (trajectory.length > 0) {
     const lastPoint = trajectory[trajectory.length - 1];
-    if (lastPoint.y > 0 && state[2] < 0) {
-      const fraction = lastPoint.y / (lastPoint.y - state[2]);
-      // Step backward from the underground state to exactly z = 0
+    const currentX = Math.sqrt(state[0] ** 2 + state[1] ** 2);
+    const groundElev = getGroundElev(currentX, topography);
+    
+    if (lastPoint.y > groundElev && state[2] < groundElev) {
+      const fraction = (lastPoint.y - groundElev) / (lastPoint.y - state[2]);
+      // Step backward from the underground state to exactly ground level
       state[0] = state[0] - state[3] * dt * (1 - fraction); 
       state[1] = state[1] - state[4] * dt * (1 - fraction); 
-      state[2] = 0;
+      state[2] = groundElev;
       t = lastPoint.t + dt * fraction;
     }
   }
 
   const finalDist = Math.sqrt(state[0] ** 2 + state[1] ** 2);
+  const finalGroundElev = getGroundElev(finalDist, topography);
   trajectory.push({
     x: finalDist,
-    y: 0,
+    y: Math.max(finalGroundElev, state[2]),
     t,
     v: Math.sqrt(state[3] ** 2 + state[4] ** 2 + state[5] ** 2),
     lat: lat + state[1] / (kmPerLat * 1000),
     lng: lng + state[0] / (kmPerLng * 1000),
+    groundElev: finalGroundElev,
   });
 
-  const initialAtmos = getAtmosphericProperties(Math.max(0, elevation));
+  const initialAtmos = getAtmosphericProperties(Math.max(0, elevation), params.surfaceTemp, params.lapseRate);
   
   return {
     trajectory,
@@ -324,7 +366,7 @@ export function calculateAerosolSpread(params: AerosolParams) {
     maxRadius: trajectory[trajectory.length - 1].radiusKm
   };
 }
-export function calculateEruption(params: PhysicsParams) {
+export function calculateEruption(params: PhysicsParams, topography?: TopoPoint[]) {
   const spread = [];
   
   let worstSpreadParams = null;
@@ -367,14 +409,14 @@ export function calculateEruption(params: PhysicsParams) {
   const primary = calculateTrajectory({
     ...params,
     launchAzimuth: params.windDirection
-  });
+  }, topography);
 
   // WORST CASE TRAJECTORY
   // The absolute maximum hazard boundary from the spread
   const worstCase = calculateTrajectory({
     ...(worstSpreadParams || params),
     launchAzimuth: params.windDirection
-  });
+  }, topography);
 
   return {
     primary,
@@ -400,8 +442,9 @@ export interface AcademicMetrics {
 export function calculateAcademicMetrics(params: PhysicsParams, aerosolParams: AerosolParams): AcademicMetrics {
   // Scale up mass linearly with projectile count to simulate macroscopic event
   const scaleFactor = 2e8; 
+  const rockDensity = params.rockDensity ?? 2500;
   const totalMassKg = params.mass * Math.max(1, params.projectileCount) * scaleFactor;
-  const volumeM3 = totalMassKg / 2500;
+  const volumeM3 = totalMassKg / rockDensity;
   
   // Plume Height H approx max height of ballistic (simplified termodynamics model)
   const plumeHeightKm = Math.max(0, (Math.pow(params.v0 * Math.sin(params.angle * Math.PI / 180), 2) / (2 * 9.81))) / 1000;

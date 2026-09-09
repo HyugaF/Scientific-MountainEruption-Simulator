@@ -2,7 +2,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { PhysicsParams, AerosolParams } from '@/utils/physics';
 import { KRAKATOA_PRESET, AEROSOL_PRESET, SimulationMode, HISTORICAL_PRESETS } from '@/hooks/useSimulation';
-import { Settings, Wind, Compass, RefreshCw, Play, Pause, Square, Globe, Target, Mountain, History, Info, X } from 'lucide-react';
+import { Settings, Wind, Compass, RefreshCw, Play, Pause, Square, Globe, Target, Mountain, History, Info, X, ExternalLink, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
@@ -61,9 +61,9 @@ export default function InputPanel({
           <button 
             onClick={() => setShowInfo(true)}
             className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-md transition-colors"
-            title="Referensi Saintifik"
+            title="Daftar Pustaka"
           >
-            <Info className="w-5 h-5" />
+            <BookOpen className="w-5 h-5" />
           </button>
         </div>
 
@@ -280,15 +280,63 @@ export default function InputPanel({
             </div>
             
             {params.airDragEnabled && (
-              <div className="space-y-2 pt-2 border-t border-neutral-800/50">
-                <div className="flex justify-between text-xs">
-                  <label>Koefisien Aerodinamis (Bentuk)</label>
-                  <span className="text-orange-400">{params.dragCoefficient.toFixed(2)}</span>
+              <>
+                <div className="space-y-2 pt-2 border-t border-neutral-800/50">
+                  <div className="flex justify-between text-xs">
+                    <label>Koefisien Aerodinamis (Bentuk)</label>
+                    <span className="text-orange-400">{params.dragCoefficient.toFixed(2)}</span>
+                  </div>
+                  <input type="range" min="0.1" max="1.0" step="0.05" value={params.dragCoefficient} onChange={(e) => handlePhysicsChange('dragCoefficient', Number(e.target.value))} className="w-full accent-orange-500 cursor-pointer" />
+                  <p className="text-[10px] text-neutral-500 leading-tight">0.1 = Bulat sempurna (aerodinamis).<br/>1.0 = Sangat kasar/Batu Apung.</p>
                 </div>
-                <input type="range" min="0.1" max="1.0" step="0.05" value={params.dragCoefficient} onChange={(e) => handlePhysicsChange('dragCoefficient', Number(e.target.value))} className="w-full accent-orange-500 cursor-pointer" />
-                <p className="text-[10px] text-neutral-500 leading-tight">0.1 = Bulat sempurna (aerodinamis).<br/>1.0 = Sangat kasar/Batu Apung.</p>
-              </div>
+
+                <div className="space-y-2 pt-2 border-t border-neutral-800/50">
+                  <div className="flex justify-between text-xs">
+                    <label>Massa Jenis Batuan (Density)</label>
+                    <span className="text-orange-400">{params.rockDensity ?? 2500} kg/m³</span>
+                  </div>
+                  <input type="range" min="300" max="3300" step="100" value={params.rockDensity ?? 2500} onChange={(e) => handlePhysicsChange('rockDensity', Number(e.target.value))} className="w-full accent-orange-500 cursor-pointer" />
+                  <p className="text-[10px] text-neutral-500 leading-tight">Mempengaruhi luas penampang (Air Drag).<br/>~500 = Batu Apung (Pumice), ~2800 = Basalt.</p>
+                </div>
+              </>
             )}
+
+            <div className="space-y-2 pt-4 mt-2 border-t border-neutral-800/50">
+              <div className="flex items-center gap-2 text-xs font-bold text-neutral-400 mb-2 uppercase tracking-wider">
+                Geospasial & Termodinamika
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <label>Garis Lintang (Coriolis Effect)</label>
+                  <span className="text-orange-400">{params.lat.toFixed(1)}°</span>
+                </div>
+                <input type="range" min="-90" max="90" step="1" value={params.lat} onChange={(e) => handlePhysicsChange('lat', Number(e.target.value))} className="w-full accent-orange-500 cursor-pointer" />
+                <p className="text-[10px] text-neutral-500 leading-tight">Menentukan parameter defleksi Coriolis ($f$).</p>
+              </div>
+
+              {params.airDragEnabled && (
+                <>
+                  <div className="space-y-2 pt-2 border-t border-neutral-800/50">
+                    <div className="flex justify-between text-xs">
+                      <label>Suhu Permukaan (T₀)</label>
+                      <span className="text-orange-400">{params.surfaceTemp ?? 15}°C</span>
+                    </div>
+                    <input type="range" min="-30" max="50" step="1" value={params.surfaceTemp ?? 15} onChange={(e) => handlePhysicsChange('surfaceTemp', Number(e.target.value))} className="w-full accent-orange-500 cursor-pointer" />
+                    <p className="text-[10px] text-neutral-500 leading-tight">Mengubah profil kerapatan udara (ρ) & batas Mach.</p>
+                  </div>
+                  
+                  <div className="space-y-2 pt-2 border-t border-neutral-800/50">
+                    <div className="flex justify-between text-xs">
+                      <label>Lapse Rate Atmosfer</label>
+                      <span className="text-orange-400">{params.lapseRate ?? 6.5} K/km</span>
+                    </div>
+                    <input type="range" min="2" max="10" step="0.1" value={params.lapseRate ?? 6.5} onChange={(e) => handlePhysicsChange('lapseRate', Number(e.target.value))} className="w-full accent-orange-500 cursor-pointer" />
+                    <p className="text-[10px] text-neutral-500 leading-tight">Penurunan suhu terhadap ketinggian (Troposfer).</p>
+                  </div>
+                </>
+              )}
+            </div>
             
             <div className="flex items-center justify-between pt-2 border-t border-neutral-800/50 mt-2">
               <label className="text-xs font-medium">Profil Angin Vertikal (Wind Shear)</label>
@@ -338,6 +386,15 @@ export default function InputPanel({
             <input type="range" min="10" max="60" step="1" value={aerosolParams.stratosphericWind} onChange={(e) => handleAerosolChange('stratosphericWind', Number(e.target.value))} className="w-full accent-blue-500 cursor-pointer" />
             <p className="text-[10px] text-neutral-500">Angin stratosfer ekuatorial bergerak ke arah Barat (Easterlies).</p>
           </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs">
+              <label>Koefisien Difusi Eddy (Turbulensi)</label>
+              <span className="text-purple-400">{aerosolParams.diffusionRate} km/hari</span>
+            </div>
+            <input type="range" min="10" max="500" step="10" value={aerosolParams.diffusionRate} onChange={(e) => handleAerosolChange('diffusionRate', Number(e.target.value))} className="w-full accent-purple-500 cursor-pointer" />
+            <p className="text-[10px] text-neutral-500">Laju pelebaran (dispersi lateral) awan abu di Stratosfer.</p>
+          </div>
           
           <div className="p-3 bg-neutral-800/50 rounded-lg border border-neutral-700/50 mt-4">
             <p className="text-xs text-neutral-300 leading-relaxed">
@@ -367,7 +424,7 @@ export default function InputPanel({
             >
               <div className="flex items-center justify-between p-5 border-b border-neutral-800 bg-neutral-900/50">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Info className="w-5 h-5 text-orange-500" /> Referensi Saintifik & Dasar Teori
+                  <BookOpen className="w-5 h-5 text-orange-500" /> Daftar Pustaka
                 </h3>
                 <button onClick={() => setShowInfo(false)} className="text-neutral-400 hover:text-white transition-colors">
                   <X className="w-5 h-5" />
@@ -375,104 +432,105 @@ export default function InputPanel({
               </div>
               
               <div className="p-6 overflow-y-auto custom-scrollbar text-sm text-neutral-300 space-y-6">
-                
-                <section className="space-y-2">
-                  <h4 className="text-orange-400 font-semibold mb-2">1. Trajektori Balistik (Integrasi RK4 & ISA 1976)</h4>
-                  <p>Aplikasi ini tidak menggunakan aproksimasi Euler sederhana. Kami mengintegrasikan hukum Newton kedua menggunakan <b>4th-Order Runge-Kutta (RK4)</b> untuk akurasi numerik tertinggi. Simulasi juga memecah ejekta menjadi spektrum partikel (Total Grain Size Distribution):</p>
-                  <div className="bg-neutral-800 p-3 rounded-lg border border-neutral-700 font-mono text-xs overflow-x-auto text-blue-300">
-                    F_drag = -½ ρ(z) v² C_d(M) A<br/>
-                    ρ(z), T(z), a(z) = US Standard Atmosphere 1976
-                  </div>
-                  <ul className="list-disc pl-5 space-y-1 text-neutral-400 mt-2">
-                    <li><b>Bom Vulkanik Berat (Boulders)</b>: Memiliki inersia raksasa yang tidak terpengaruh gaya geser angin. Memancar 360 derajat (radial) jatuh di area terdekat (<i>Ballistic Hazard Zone</i>).</li>
-                    <li><b>Lapilli & Coarse Ash</b>: Memiliki rasio massa-terhadap-luas (area-to-mass) rendah, sehingga terseret secara parabolik-elips mengikuti arah vektor angin (<i>Suspended Regime</i>).</li>
-                    <li><b>Barometric Density ρ(z)</b>: Diukur presisi menggunakan <i>US Standard Atmosphere 1976</i>. Proyektil di stratosfer nyaris tidak mengalami gaya hambat (F_drag) karena profil kerapatan udara logaritmik.</li>
-                    <li><b>Mach-Dependent Wave Drag C_d(M)</b>: Ejekta vulkanik melesat di kecepatan supersonik (v &gt; 343 m/s). Koefisien hambat udara (C_d) diprogram untuk melonjak tajam saat menembus <i>sound barrier</i> (Transonic/Supersonic Wave Drag), mendistorsi trajektori jauh dari kurva parabola ideal.</li>
-                  </ul>
-                </section>
 
-                <section className="space-y-2">
-                  <h4 className="text-orange-400 font-semibold mb-2">2. Termodinamika Kolom Letusan (Plume Height & MER)</h4>
-                  <p>Ketinggian awan abu (plume) dan laju pelepasan massa (Mass Eruption Rate / MER) diturunkan menggunakan persamaan klasik geologi kuantitatif oleh <b>Sparks (1986)</b> dan <b>Mastin et al. (2009)</b>:</p>
-                  <div className="bg-neutral-800 p-3 rounded-lg border border-neutral-700 font-mono text-xs overflow-x-auto text-yellow-300">
-                    H = 2.00 × (MER)^0.241<br/>
-                    MER = (H / 2.00)^4.149
-                  </div>
-                  <p className="text-neutral-400 mt-2">Dimana H adalah tinggi kolom (km) dan MER dalam satuan (kg/s). Total energi termal dan kinetik ditransformasikan ke dalam skala megaton TNT untuk visibilitas awam.</p>
-                </section>
-
-                <section className="space-y-2">
-                  <h4 className="text-orange-400 font-semibold mb-2">3. Profil Angin Vertikal (Wind Shear)</h4>
-                  <p>Model ini mengimplementasikan lapisan atmosfer ganda:</p>
-                  <ul className="list-disc pl-5 space-y-1 text-neutral-400">
-                    <li><b>Troposfer (0 - 15 km)</b>: Dipengaruhi oleh variabel kecepatan dan arah angin permukaan lokal.</li>
-                    <li><b>Stratosfer (&gt; 15 km)</b>: Dikuasai oleh angin <i>Jet Stream</i>, mensimulasikan pembelokan ekstrem dari debu (*lapilli* & *ash*) ketika menembus batas tropopause, fenomena khas letusan super (Krakatau 1883, Pinatubo 1991).</li>
-                  </ul>
-                </section>
-
-                <section className="space-y-2">
-                  <h4 className="text-orange-400 font-semibold mb-2">4. Klasifikasi VEI (Volcanic Explosivity Index)</h4>
-                  <p>Skala logaritmik VEI (Newhall & Self, 1982) dihitung secara aproksimasi berdasarkan ketinggian kolom letusan (H) dan estimasi volume tefra (V):</p>
-                  <div className="bg-neutral-800 p-3 rounded-lg border border-neutral-700 font-mono text-xs overflow-x-auto text-green-300">
-                    VEI ≈ log₁₀(V) - 4
-                  </div>
-                  <p className="text-neutral-400 mt-2">Ketinggian plume juga menjadi penentu: VEI 4 (10-25 km), VEI 5 (&gt;25 km), VEI 6 (&gt;30 km). Skala ini membantu memprediksi dampak global dari aerosol yang diinjeksikan.</p>
-                </section>
-
-                <section className="space-y-2">
-                  <h4 className="text-orange-400 font-semibold mb-2">5. Penyebaran Aerosol & Dampak Iklim</h4>
-                  <p>Gas Sulfur Dioksida (SO₂) yang menembus stratosfer beroksidasi menjadi aerosol sulfat. Model kami menyimulasikan penyebarannya secara global tanpa tercuci oleh hujan (karena berada di atas troposfer).</p>
-                  <ul className="list-disc pl-5 space-y-1 text-neutral-400">
-                    <li><b>Efek Albedo</b>: Aerosol ini memantulkan radiasi matahari kembali ke luar angkasa.</li>
-                    <li><b>Volcanic Winter</b>: Menyebabkan penurunan suhu global secara temporer (misal: Krakatau 1883 menurunkan suhu ~1.2°C, Tambora 1815 memicu &quot;Tahun Tanpa Musim Panas&quot;).</li>
-                  </ul>
-                </section>
-
-                <section className="space-y-2">
-                  <h4 className="text-orange-400 font-semibold mb-2">6. Konversi Energi (Ekuivalen Megaton TNT)</h4>
-                  <p>Total pelepasan energi kinetik dan termal (E) dikonversikan ke skala ledakan nuklir (Megaton TNT) menggunakan standar ekuivalensi:</p>
-                  <div className="bg-neutral-800 p-3 rounded-lg border border-neutral-700 font-mono text-xs overflow-x-auto text-red-300">
-                    E_k = ½ m v²<br/>
-                    1 Megaton TNT = 4.184 × 10¹⁵ Joules
-                  </div>
-                  <p className="text-neutral-400 mt-2">Sebagai perbandingan, bom Hiroshima melepaskan energi ~0.015 MT, sementara Krakatau 1883 diestimasi melepaskan lebih dari 200 MT energi termal & kinetik.</p>
-                </section>
-
-                <section className="space-y-2">
-                  <h4 className="text-orange-400 font-semibold mb-2">7. Gelombang Seismik & Kejut Atmosferik</h4>
-                  <p>Simulasi merender rambatan gelombang berdasar pada konstanta kecepatan fisik (<i>r = v × t</i>). Jarak atenuasi (pelemahan) maksimal dikalibrasi menggunakan persamaan logaritmik berdasarkan referensi vulkanologi:</p>
-                  <div className="bg-neutral-800 p-3 rounded-lg border border-neutral-700 font-mono text-xs overflow-x-auto text-purple-300">
-                    r(t) = v × t<br/>
-                    Atenuasi Seismik ∝ log₁₀(E_k)^2.5<br/>
-                    Atenuasi Akustik ∝ log₁₀(E_k)^4
-                  </div>
-                  <ul className="list-disc pl-5 space-y-1 text-neutral-400 mt-2">
-                    <li><b>Ground Tremor (Cincin Merah)</b>: Gelombang Seismik (P/S-Wave). Kecepatan merambat sangat tinggi di litosfer (<b>~5.000 m/s</b>), namun energi gempa vulkanik teredam kuat secara lokal (atenuasi tinggi) sehingga cincin merah akan cepat menghilang pada radius 50-800 km tergantung VEI letusan.</li>
-                    <li><b>Atmospheric Shockwave (Cincin Putih)</b>: Gelombang Infrasonik (akustik). Merambat lebih lambat pada kecepatan suara (<b>~343 m/s</b>), namun memiliki atenuasi rendah di udara. Radius jangkauannya divalidasi mampu mengelilingi ribuan kilometer tanpa kehilangan inersia.</li>
-                  </ul>
-                </section>
-
-                <section className="space-y-2 pt-4 border-t border-neutral-800">
-                  <h4 className="text-orange-400 font-semibold mb-3 flex items-center gap-2">
-                    <History className="w-4 h-4" /> Daftar Pustaka & Sumber Data
-                  </h4>
-                  <div className="space-y-3 text-xs">
+                <section className="space-y-4">
+                  <div className="space-y-3">
                     <div>
-                      <span className="font-bold text-neutral-300 block mb-1">Landasan Teori Dinamika Fluida & Plume:</span>
-                      <ul className="list-disc pl-4 text-neutral-500 space-y-1">
-                        <li>Mastin, L. G., et al. (2009). <i className="text-neutral-400">A multidisciplinary effort to assign realistic source parameters to models of volcanic ash-cloud transport and dispersion.</i> Journal of Volcanology and Geothermal Research, 186(1-2), 10-21.</li>
-                        <li>Sparks, R. S. J. (1986). <i className="text-neutral-400">The dimensions and dynamics of volcanic eruption columns.</i> Bulletin of Volcanology, 48(1), 3-15.</li>
-                        <li>Alatorre-Ibargüengoitia, M. A., et al. (2012). <i className="text-neutral-400">Drag coefficient and terminal velocity of volcanic particles.</i> Earth and Planetary Science Letters.</li>
+                      <span className="font-bold text-neutral-300 block mb-3">Landasan Teori Dinamika Fluida & Plume:</span>
+                      <ul className="space-y-3">
+                        <li>
+                          <a href="https://doi.org/10.1029/1998RG000054" target="_blank" rel="noopener noreferrer" className="group block bg-neutral-900/50 hover:bg-neutral-800 p-3 rounded-lg border border-neutral-800 hover:border-orange-500/30 transition-all">
+                            <div className="flex items-start justify-between gap-4">
+                              <span className="text-neutral-400 text-xs">Robock, A. (2000). <i className="text-neutral-300">Volcanic eruptions and climate.</i> Reviews of Geophysics.</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover:text-orange-400 shrink-0" />
+                            </div>
+                          </a>
+                        </li>
+                        <li>
+                          <a href="https://doi.org/10.1016/j.cageo.2013.10.016" target="_blank" rel="noopener noreferrer" className="group block bg-neutral-900/50 hover:bg-neutral-800 p-3 rounded-lg border border-neutral-800 hover:border-orange-500/30 transition-all">
+                            <div className="flex items-start justify-between gap-4">
+                              <span className="text-neutral-400 text-xs">Tsunematsu et al. (2014). <i className="text-neutral-300">A numerical model of ballistic transport with collisions in a volcanic setting.</i> Computers & Geosciences.</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover:text-orange-400 shrink-0" />
+                            </div>
+                          </a>
+                        </li>
+                        <li>
+                          <a href="https://ui.adsabs.harvard.edu/abs/1992nrfa.book.....P" target="_blank" rel="noopener noreferrer" className="group block bg-neutral-900/50 hover:bg-neutral-800 p-3 rounded-lg border border-neutral-800 hover:border-orange-500/30 transition-all">
+                            <div className="flex items-start justify-between gap-4">
+                              <span className="text-neutral-400 text-xs">Press et al. (1992). <i className="text-neutral-300">Numerical Recipes in C: The Art of Scientific Computing.</i> Cambridge Univ. Press.</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover:text-orange-400 shrink-0" />
+                            </div>
+                          </a>
+                        </li>
+                        <li>
+                          <a href="https://doi.org/10.1016/j.jvolgeores.2009.01.008" target="_blank" rel="noopener noreferrer" className="group block bg-neutral-900/50 hover:bg-neutral-800 p-3 rounded-lg border border-neutral-800 hover:border-orange-500/30 transition-all">
+                            <div className="flex items-start justify-between gap-4">
+                              <span className="text-neutral-400 text-xs">Mastin, L. G., et al. (2009). <i className="text-neutral-300">A multidisciplinary effort to assign realistic source parameters to models of volcanic ash-cloud transport.</i> Journal of Volcanology and Geothermal Research.</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover:text-orange-400 shrink-0" />
+                            </div>
+                          </a>
+                        </li>
+                        <li>
+                          <a href="https://doi.org/10.1007/BF01073509" target="_blank" rel="noopener noreferrer" className="group block bg-neutral-900/50 hover:bg-neutral-800 p-3 rounded-lg border border-neutral-800 hover:border-orange-500/30 transition-all">
+                            <div className="flex items-start justify-between gap-4">
+                              <span className="text-neutral-400 text-xs">Sparks, R. S. J. (1986). <i className="text-neutral-300">The dimensions and dynamics of volcanic eruption columns.</i> Bulletin of Volcanology.</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover:text-orange-400 shrink-0" />
+                            </div>
+                          </a>
+                        </li>
                       </ul>
                     </div>
-                    <div>
-                      <span className="font-bold text-neutral-300 block mb-1">Data Kejadian Vulkanik (VEI & Sejarah):</span>
-                      <ul className="list-disc pl-4 text-neutral-500 space-y-1">
-                        <li><b className="text-neutral-400">Global Volcanism Program (GVP)</b>, Smithsonian Institution - Database standar untuk klasifikasi Volcanic Explosivity Index (Newhall & Self, 1982).</li>
-                        <li><b className="text-neutral-400">USGS (United States Geological Survey)</b> - Arsip observasi Mount St. Helens (1980) dan Novarupta (1912).</li>
-                        <li><b className="text-neutral-400">Badan Geologi (PVMBG) Indonesia</b> - Data historis aktivitas erupsi gunung api Nusantara (Krakatau, Tambora, Kelud, Merapi, Agung, Toba).</li>
-                        <li>Rampino, M. R., & Self, S. (1992). <i className="text-neutral-400">Volcanic winter and accelerated glaciation following the Toba super-eruption.</i> Nature, 359(6390), 50-52.</li>
+                    
+                    <div className="pt-4 mt-2 border-t border-neutral-800">
+                      <span className="font-bold text-neutral-300 block mb-3">Data Kejadian Vulkanik (VEI & Sejarah):</span>
+                      <ul className="space-y-3">
+                        <li>
+                          <a href="https://volcano.si.edu/" target="_blank" rel="noopener noreferrer" className="group block bg-neutral-900/50 hover:bg-neutral-800 p-3 rounded-lg border border-neutral-800 hover:border-orange-500/30 transition-all">
+                            <div className="flex items-start justify-between gap-4">
+                              <span className="text-neutral-400 text-xs"><b className="text-neutral-300">Global Volcanism Program (GVP)</b>, Smithsonian Institution - Database standar klasifikasi VEI.</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover:text-orange-400 shrink-0" />
+                            </div>
+                          </a>
+                        </li>
+                        <li>
+                          <a href="https://vsi.esdm.go.id/" target="_blank" rel="noopener noreferrer" className="group block bg-neutral-900/50 hover:bg-neutral-800 p-3 rounded-lg border border-neutral-800 hover:border-orange-500/30 transition-all">
+                            <div className="flex items-start justify-between gap-4">
+                              <span className="text-neutral-400 text-xs"><b className="text-neutral-300">Badan Geologi (PVMBG) Indonesia</b> - Data historis aktivitas erupsi gunung api Nusantara.</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover:text-orange-400 shrink-0" />
+                            </div>
+                          </a>
+                        </li>
+                        <li>
+                          <a href="https://www.nature.com/articles/359050a0" target="_blank" rel="noopener noreferrer" className="group block bg-neutral-900/50 hover:bg-neutral-800 p-3 rounded-lg border border-neutral-800 hover:border-orange-500/30 transition-all">
+                            <div className="flex items-start justify-between gap-4">
+                              <span className="text-neutral-400 text-xs">Rampino, M. R., & Self, S. (1992). <i className="text-neutral-300">Volcanic winter and accelerated glaciation following the Toba super-eruption.</i> Nature.</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover:text-orange-400 shrink-0" />
+                            </div>
+                          </a>
+                        </li>
                       </ul>
+                    </div>
+
+                    <div className="pt-4 mt-2 border-t border-neutral-800">
+                      <span className="font-bold text-red-400 block mb-3">Limitasi & Asumsi Model (Simplifikasi):</span>
+                      <div className="space-y-3">
+                        <div className="bg-neutral-900/80 p-3.5 rounded-lg border border-neutral-800/80">
+                          <h4 className="text-neutral-300 text-xs font-bold mb-1">1. Gaya Angkat (Magnus Effect) Diabaikan</h4>
+                          <p className="text-neutral-400 text-xs leading-relaxed">Rotasi (spin) proyektil vulkanik tidak beraturan di udara yang dapat menciptakan gaya angkat (Lift Force) tak terduga tidak dimodelkan demi efisiensi komputasi real-time. Mesin RK4 hanya menghitung Drag Force translasi.</p>
+                        </div>
+                        <div className="bg-neutral-900/80 p-3.5 rounded-lg border border-neutral-800/80">
+                          <h4 className="text-neutral-300 text-xs font-bold mb-1">2. Asumsi Proyektil Bulat (Spherical Equivalent)</h4>
+                          <p className="text-neutral-400 text-xs leading-relaxed">Meski koefisien drag (Cd) dan densitas dapat dikustomisasi, batuan asimetris (tajam/pipih) disederhanakan menjadi bentuk bola hipotetis dengan volume yang setara dalam perhitungan luas penampang hambat.</p>
+                        </div>
+                        <div className="bg-neutral-900/80 p-3.5 rounded-lg border border-neutral-800/80">
+                          <h4 className="text-neutral-300 text-xs font-bold mb-1">3. Gravitasi Permukaan Ideal & Elipsoid Bumi</h4>
+                          <p className="text-neutral-400 text-xs leading-relaxed">Variasi medan gravitasi sekunder akibat bentuk ekuatorial Bumi (Elipsoid WGS84) tidak dimasukkan. Penurunan percepatan gravitasi difungsikan linear terhadap elevasi menggunakan baseline 9.80665 m/s².</p>
+                        </div>
+                        <div className="bg-neutral-900/80 p-3.5 rounded-lg border border-neutral-800/80">
+                          <h4 className="text-neutral-300 text-xs font-bold mb-1">4. Ketiadaan Updraft Konveksi Termal</h4>
+                          <p className="text-neutral-400 text-xs leading-relaxed">Partikel dilontarkan menembus profil atmosfer standar (ISA 1976). Arus konveksi gas super-panas (turbulent updraft) pada tiang asap plume kawah tidak dikalkulasikan, padahal hal ini sangat mengubah viskositas udara lokal.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </section>

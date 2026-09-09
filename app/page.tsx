@@ -6,7 +6,8 @@ import { useSimulation } from '@/hooks/useSimulation';
 import InputPanel from '@/components/InputPanel';
 import ChartAnalysis from '@/components/ChartAnalysis';
 import AIAdvisor from '@/components/AIAdvisor';
-import { HelpCircle, ChevronRight, ChevronLeft, X, CheckCircle2, Target, Globe, Mountain, Wind } from 'lucide-react';
+import MateriModule from '@/components/MateriModule';
+import { HelpCircle, BookOpen, ChevronRight, ChevronLeft, X, CheckCircle2, Target, Globe, Mountain, Wind } from 'lucide-react';
 
 // Load MapVisualizer dynamically to disable SSR (Leaflet requires window object)
 const MapVisualizer = dynamic(() => import('@/components/MapVisualizer'), { 
@@ -48,13 +49,13 @@ const TUTORIAL_STEPS = [
 ];
 
 export default function KrakatoaDashboard() {
-  const [isEntered, setIsEntered] = useState(false);
+  const [appState, setAppState] = useState<'landing' | 'transition' | 'app' | 'materi'>('landing');
   const [tutorialStep, setTutorialStep] = useState(0); // 0 = off
   const [isMobile, setIsMobile] = useState(false);
   
   useEffect(() => {
-    setIsMobile(window.innerWidth < 768);
     const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -65,11 +66,12 @@ export default function KrakatoaDashboard() {
     aerosolParams, setAerosolParams,
     ballisticResult, aerosolResult, academicMetrics,
     progressIndex, setProgressIndex, totalPoints,
-    isPlaying, togglePlay, playbackSpeed, setPlaybackSpeed
+    isPlaying, togglePlay, playbackSpeed, setPlaybackSpeed,
+    isFetchingTopo
   } = useSimulation();
 
   const startTutorial = () => {
-    setIsEntered(true);
+    setAppState('app');
     setTutorialStep(1);
   };
 
@@ -77,7 +79,7 @@ export default function KrakatoaDashboard() {
   const prevStep = () => setTutorialStep(p => Math.max(p - 1, 1));
   const endTutorial = () => {
     setTutorialStep(0);
-    setIsEntered(false); // Back to homepage
+    setAppState('landing'); // Back to homepage
   };
 
   const getTutorialPosition = (index: number) => {
@@ -94,7 +96,14 @@ export default function KrakatoaDashboard() {
     }
   };
 
-  if (!isEntered) {
+  const handleEnterApp = () => {
+    setAppState('transition');
+    setTimeout(() => {
+      setAppState('app');
+    }, 2000);
+  };
+
+  if (appState === 'landing') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-6 relative overflow-hidden">
         {/* Decorative background gradients (Changed to UNS Blues) */}
@@ -153,7 +162,7 @@ export default function KrakatoaDashboard() {
               transition={{ delay: 1.1, duration: 0.8, ease: "easeOut" }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setIsEntered(true)}
+              onClick={handleEnterApp}
               className="w-full justify-center px-8 py-3.5 bg-gradient-to-r from-[#0ea5e9] to-[#005ea2] hover:from-sky-400 hover:to-blue-600 text-white rounded-full font-semibold shadow-[0_0_30px_rgba(14,165,233,0.3)] hover:shadow-[0_0_40px_rgba(14,165,233,0.5)] transition-all duration-300 flex items-center gap-2"
             >
               Masuk Aplikasi
@@ -172,9 +181,48 @@ export default function KrakatoaDashboard() {
               <HelpCircle className="w-5 h-5" />
               Tutorial Penggunaan
             </motion.button>
+            
+            <motion.button
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 1.5, duration: 0.8, ease: "easeOut" }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setAppState('materi')}
+              className="w-full justify-center px-8 py-3 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 hover:text-white rounded-full font-medium transition-all duration-300 flex items-center gap-2 mt-2"
+            >
+              <BookOpen className="w-5 h-5" />
+              Materi yang Digunakan
+            </motion.button>
           </div>
         </motion.div>
       </div>
+    );
+  }
+
+  
+  if (appState === 'materi') {
+    return <MateriModule onBack={() => setAppState('landing')} />;
+  }
+
+  if (appState === 'transition') {
+    return (
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5 }}
+        className="h-screen w-screen bg-black flex items-center justify-center relative z-50 overflow-hidden"
+      >
+        <motion.div
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1.5, opacity: 1 }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
+          className="flex flex-col items-center justify-center"
+        >
+          <img src="/image.png" alt="Logo UNS Transition" className="w-40 h-40 object-contain drop-shadow-[0_0_40px_rgba(14,165,233,0.8)]" />
+        </motion.div>
+      </motion.div>
     );
   }
 
@@ -274,14 +322,19 @@ export default function KrakatoaDashboard() {
             progressIndex={progressIndex} 
             params={params} 
           />
-          <div className="absolute top-4 right-4 z-[400] bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 text-xs text-white shadow-lg pointer-events-none">
-            {mode === 'ballistic' ? 'Trajektori Lokal (Satelit)' : 'Penyebaran Global (Satelit)'}
+          <div className="absolute top-4 right-4 z-[400] bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 text-xs text-white shadow-lg pointer-events-none flex flex-col items-end gap-1">
+            <span>{mode === 'ballistic' ? 'Trajektori Lokal (Satelit)' : 'Penyebaran Global (Satelit)'}</span>
+            {isFetchingTopo && (
+              <span className="text-orange-400 font-medium animate-pulse flex items-center gap-1">
+                <Mountain className="w-3 h-3" /> Mengambil Topografi Satelit...
+              </span>
+            )}
           </div>
         </div>
         
         {/* Bottom - Chart Analysis & AI */}
         <div className="flex-shrink-0 flex flex-col xl:flex-row gap-2 md:gap-4 h-auto md:h-80 pb-4 md:pb-0">
-          <div className={`h-[450px] md:h-full flex-[2] ${tutorialStep === 5 ? 'relative z-[10000] ring-4 ring-orange-500 rounded-xl shadow-[0_0_40px_rgba(234,88,12,0.3)] pointer-events-none bg-neutral-900' : ''}`}>
+          <div className={`min-h-[500px] h-auto md:h-full flex-[2] ${tutorialStep === 5 ? 'relative z-[10000] ring-4 ring-orange-500 rounded-xl shadow-[0_0_40px_rgba(234,88,12,0.3)] pointer-events-none bg-neutral-900' : ''}`}>
             <ChartAnalysis 
               mode={mode}
               ballisticResult={ballisticResult} 
