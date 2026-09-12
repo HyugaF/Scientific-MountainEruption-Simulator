@@ -133,7 +133,8 @@ function getMachDependentDrag(baseCd: number, machNumber: number): number {
 }
 
 export function calculateTrajectory(params: PhysicsParams, topography?: TopoPoint[]): TrajectoryResult {
-  const { v0, angle, mass, windSpeed, windDirection, windShearEnabled, stratosphericWindSpeed, stratosphericWindDir, airDragEnabled, dragCoefficient, lat, lng, elevation } = params;
+  let { v0, angle, mass, windSpeed, windDirection, windShearEnabled, stratosphericWindSpeed, stratosphericWindDir, airDragEnabled, dragCoefficient, lat, lng, elevation } = params;
+  mass = Math.max(0.000001, mass);
   
   const theta = (angle * Math.PI) / 180;
   
@@ -177,7 +178,7 @@ export function calculateTrajectory(params: PhysicsParams, topography?: TopoPoin
   const trajectory: TrajectoryPoint[] = [];
   
   // Adaptive time step based on velocity (finer steps for high velocity to prevent integration explosion)
-  const dt = Math.max(0.01, Math.min(0.5, 200 / v0)); 
+  let dt = 0.5; // Changed to let dt so it can be used for interpolation 
   
   // Derivative function for RK4
   const getDerivatives = (currentState: number[], currentTime: number) => {
@@ -253,6 +254,14 @@ export function calculateTrajectory(params: PhysicsParams, topography?: TopoPoin
     
     // 4th-Order Runge-Kutta (RK4) Step
     const k1 = getDerivatives(state, t);
+    
+    const vMag = Math.sqrt(state[3]**2 + state[4]**2 + state[5]**2);
+    const aMag = Math.sqrt(k1[3]**2 + k1[4]**2 + k1[5]**2);
+    dt = 0.5;
+    if (aMag > 0) {
+      dt = Math.max(0.001, Math.min(0.5, Math.max(5, vMag * 0.1) / aMag));
+    }
+    
     const state_k2 = state.map((s, i) => s + 0.5 * dt * k1[i]);
     const k2 = getDerivatives(state_k2, t + 0.5 * dt);
     const state_k3 = state.map((s, i) => s + 0.5 * dt * k2[i]);

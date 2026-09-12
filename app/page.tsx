@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSimulation } from '@/hooks/useSimulation';
+import { generateSimulationReport } from '@/utils/exportPdf';
 import InputPanel from '@/components/InputPanel';
 import ChartAnalysis from '@/components/ChartAnalysis';
 import AIAdvisor from '@/components/AIAdvisor';
@@ -334,13 +335,14 @@ export default function KrakatoaDashboard() {
         
         {/* Bottom - Chart Analysis & AI */}
         <div className="flex-shrink-0 flex flex-col xl:flex-row gap-2 md:gap-4 h-auto md:h-80 pb-4 md:pb-0">
-          <div className={`min-h-[500px] h-auto md:h-full flex-[2] ${tutorialStep === 5 ? 'relative z-[10000] ring-4 ring-orange-500 rounded-xl shadow-[0_0_40px_rgba(234,88,12,0.3)] pointer-events-none bg-neutral-900' : ''}`}>
+          <div className={`min-h-[380px] h-auto md:h-full flex-[2] ${tutorialStep === 5 ? 'relative z-[10000] ring-4 ring-orange-500 rounded-xl shadow-[0_0_40px_rgba(234,88,12,0.3)] pointer-events-none bg-neutral-900' : ''}`}>
             <ChartAnalysis 
               mode={mode}
               ballisticResult={ballisticResult} 
               aerosolResult={aerosolResult}
               academicMetrics={academicMetrics}
-              progressIndex={progressIndex} 
+              progressIndex={progressIndex}
+              onExport={() => generateSimulationReport(mode, params, aerosolParams, ballisticResult, aerosolResult, academicMetrics)}
             />
           </div>
           <div className={`h-[350px] md:h-full flex-1 min-w-0 xl:min-w-[300px] ${tutorialStep === 5 ? 'relative z-[10000] ring-4 ring-orange-500 rounded-xl shadow-[0_0_40px_rgba(234,88,12,0.3)] pointer-events-none bg-neutral-900' : ''}`}>

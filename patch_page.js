@@ -1,10 +1,17 @@
 const fs = require('fs');
 let code = fs.readFileSync('app/page.tsx', 'utf8');
-code = code.replace(/useEffect\(\(\) => \{[\s\S]*?return \(\) => window\.removeEventListener\('resize', handleResize\);\n  \}, \[\]\);/m, 
-`useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);`);
+
+// Remove from InputPanel
+code = code.replace(
+  'tutorialStep={tutorialStep}\n          onExport={() => generateSimulationReport(mode, params, aerosolParams, ballisticResult, aerosolResult, academicMetrics)}\n        />',
+  'tutorialStep={tutorialStep}\n        />'
+);
+
+// Add to ChartAnalysis
+code = code.replace(
+  'progressIndex={progressIndex}\n            />',
+  'progressIndex={progressIndex}\n              onExport={() => generateSimulationReport(mode, params, aerosolParams, ballisticResult, aerosolResult, academicMetrics)}\n            />'
+);
+
 fs.writeFileSync('app/page.tsx', code);
+console.log("Patched page.tsx");

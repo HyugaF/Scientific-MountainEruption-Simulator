@@ -56,7 +56,7 @@ export default function Projectile2DView({ trajectory, progressIndex }: Props) {
     // e.g., view window is 1000m wide initially, but let's make it auto-scale or fixed scale?
     // User wants "camera mengikuti", so camera centers on projectile, but maybe zoomed out enough to see the ground?
     // Actually, fixed scale is good, maybe 5000m width?
-    const viewWidthMeters = 3000; 
+    const viewWidthMeters = Math.max(8000, currentPoint.y * 2.5); // Dynamic zoom 
     let scale = w / viewWidthMeters;
     
     // We want the current point to be at the center of the screen
@@ -65,7 +65,8 @@ export default function Projectile2DView({ trajectory, progressIndex }: Props) {
 
     // Calculate camera target in meters
     const camX = currentPoint.x;
-    const camY = currentPoint.y;
+    const currentGround = currentPoint.groundElev || 0;
+    const camY = Math.max(currentPoint.y / 2 + currentGround / 2, currentPoint.y - viewWidthMeters * (h/w) * 0.4);
 
     ctx.save();
     // Move origin to center of screen
@@ -78,7 +79,7 @@ export default function Projectile2DView({ trajectory, progressIndex }: Props) {
     // --- DRAW WORLD ---
     
     // Draw Dynamic Ground Polygon
-    ctx.fillStyle = '#171717';
+    ctx.fillStyle = '#1f2937'; // slate-800
     ctx.beginPath();
     
     // Start way below
@@ -161,12 +162,13 @@ export default function Projectile2DView({ trajectory, progressIndex }: Props) {
 
     // --- DRAW HUD NUMBERS (Real-time tracking next to projectile) ---
     // Projectile screen coordinates
-    const projScreenX = cx; // Since camera centers on it
-    const projScreenY = cy; 
+    const projScreenX = cx; // X is always center
+    const projScreenY = cy - (currentPoint.y - camY) * scale; // Adjust Y based on camera offset 
     
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.beginPath();
-    ctx.roundRect(projScreenX + 20, projScreenY - 60, 160, 80, 8);
+    const hudY = Math.max(20, Math.min(h - 100, projScreenY - 60));
+    ctx.roundRect(projScreenX + 20, hudY, 160, 80, 8);
     ctx.fill();
     ctx.strokeStyle = '#f97316';
     ctx.lineWidth = 1;
@@ -174,13 +176,13 @@ export default function Projectile2DView({ trajectory, progressIndex }: Props) {
 
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 12px sans-serif';
-    ctx.fillText(`T: ${currentPoint.t.toFixed(1)} s`, projScreenX + 30, projScreenY - 40);
+    ctx.fillText(`T: ${currentPoint.t.toFixed(1)} s`, projScreenX + 30, hudY + 20);
     
     ctx.fillStyle = '#a3a3a3';
     ctx.font = '11px monospace';
-    ctx.fillText(`Alt : ${(currentPoint.y).toFixed(0)} m`, projScreenX + 30, projScreenY - 20);
-    ctx.fillText(`Dist: ${(currentPoint.x).toFixed(0)} m`, projScreenX + 30, projScreenY - 5);
-    ctx.fillText(`Vel : ${currentPoint.v.toFixed(0)} m/s`, projScreenX + 30, projScreenY + 10);
+    ctx.fillText(`Alt : ${(currentPoint.y).toFixed(0)} m`, projScreenX + 30, hudY + 40);
+    ctx.fillText(`Dist: ${(currentPoint.x).toFixed(0)} m`, projScreenX + 30, hudY + 55);
+    ctx.fillText(`Vel : ${currentPoint.v.toFixed(0)} m/s`, projScreenX + 30, hudY + 70);
 
   }, [trajectory, progressIndex, dimensions]);
 

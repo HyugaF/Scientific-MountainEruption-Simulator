@@ -197,9 +197,19 @@ export function useSimulation() {
         const lats = sampled.map(p => p.lat.toFixed(5)).join(',');
         const lngs = sampled.map(p => p.lng.toFixed(5)).join(',');
 
+        if (!lats || !lngs) {
+          if (isMounted) setBallisticResult(dryRun);
+          return;
+        }
+
         // 3. Fetch from Open-Meteo
         const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`);
-        if (!res.ok) throw new Error('API Error');
+        
+        if (!res.ok) {
+          if (isMounted) setBallisticResult(dryRun);
+          return;
+        }
+        
         const data = await res.json();
 
         if (!isMounted) return;
@@ -217,7 +227,7 @@ export function useSimulation() {
           setBallisticResult(dryRun);
         }
       } catch (e) {
-        console.error("Failed to fetch topography:", e);
+        // Silently fallback to flat earth model if topography API fails (e.g. rate limit, network error)
         if (isMounted) setBallisticResult(calculateEruption(params));
       } finally {
         if (isMounted) setIsFetchingTopo(false);

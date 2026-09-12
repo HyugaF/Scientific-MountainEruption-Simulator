@@ -44,11 +44,22 @@ function MapController({ mode, startPosLat, startPosLng }: { mode: SimulationMod
 }
 
 export default function MapVisualizer({ mode, ballisticResult, aerosolResult, progressIndex, params }: Props) {
+  const [showTooltip, setShowTooltip] = useState(true);
   const primary = ballisticResult.primary.trajectory;
   const startPos: [number, number] = [primary[0]?.lat || -6.102, primary[0]?.lng || 105.423];
 
   return (
     <div className="w-full h-full relative z-[1]">
+      {mode === 'aerosol' && (
+        <div className="absolute top-4 right-4 z-[400]">
+          <button 
+            onClick={() => setShowTooltip(!showTooltip)}
+            className="bg-neutral-900/90 border border-neutral-700 text-neutral-200 text-xs shadow-lg rounded-lg px-3 py-2 hover:bg-neutral-800 transition-colors flex items-center gap-2"
+          >
+            {showTooltip ? 'Sembunyikan' : 'Tampilkan'} Panel Abu
+          </button>
+        </div>
+      )}
       <MapContainer 
         center={startPos} 
         zoom={8} 
@@ -72,6 +83,14 @@ export default function MapVisualizer({ mode, ballisticResult, aerosolResult, pr
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               noWrap={true}
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Peta Topografi">
+            <TileLayer
+              attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
+              url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+              noWrap={true}
+              maxZoom={17}
             />
           </LayersControl.BaseLayer>
         </LayersControl>
@@ -172,21 +191,33 @@ export default function MapVisualizer({ mode, ballisticResult, aerosolResult, pr
                 <Polyline positions={pathPositions} color="#a855f7" weight={2} opacity={0.5} dashArray="4 8" />
                 <Circle 
                   center={[currentAsh.lat, currentAsh.lng]}
-                  radius={currentAsh.radiusKm * 1000} // Leaflet radius is in meters
+                  radius={currentAsh.radiusKm * 1000}
                   pathOptions={{
-                    color: 'transparent',
+                    color: '#a855f7',
+                    weight: 1,
                     fillColor: '#d4d4d4',
                     fillOpacity: 0.4,
                   }}
                 >
-                  <Popup>
-                    <div className="text-xs">
-                      <b>Awan Abu Vulkanik</b><br />
-                      Hari ke: {currentAsh.day.toFixed(1)}<br />
-                      Jarak dari Krakatau: {currentAsh.distanceKm.toFixed(0)} km<br />
-                      Radius Sebaran: {currentAsh.radiusKm.toFixed(0)} km
-                    </div>
-                  </Popup>
+                  {showTooltip && (
+                    <Tooltip permanent direction="top" className="text-xs shadow-lg rounded-lg p-1">
+                      <div className="text-center font-bold text-purple-600 mb-1 border-b border-neutral-200 pb-1">Paparan Abu Vulkanik</div>
+                      <div className="flex flex-col gap-1 text-left mt-1">
+                        <div className="flex justify-between gap-4">
+                          <span className="text-neutral-500 whitespace-nowrap">Hari ke:</span>
+                          <span className="font-bold text-neutral-800 text-right">{currentAsh.day.toFixed(1)}</span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-neutral-500 whitespace-nowrap">Jarak Tempuh:</span>
+                          <span className="font-bold text-neutral-800 text-right">{currentAsh.distanceKm.toFixed(0)} km</span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-neutral-500 whitespace-nowrap">Radius Paparan:</span>
+                          <span className="font-bold text-neutral-800 text-right">{currentAsh.radiusKm.toFixed(0)} km</span>
+                        </div>
+                      </div>
+                    </Tooltip>
+                  )}
                 </Circle>
               </>
             );
