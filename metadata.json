@@ -1,5 +1,5 @@
 {
-  "name": "Simulasi Trajektori Letusan Gunung Api | UNS",
+  "name": "Mountosim: Simulasi Trajektori Letusan Gunung Api | UNS",
   "description": "Simulasi trajektori interaktif letusan gunung berapi dengan perhitungan gerak parabola dan dinamika fluida.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

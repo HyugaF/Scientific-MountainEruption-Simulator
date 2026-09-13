@@ -253,37 +253,100 @@ export default function ChartAnalysis({ mode, ballisticResult, aerosolResult, ac
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Massa & Radius Benda */}
-                    <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
-                      <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Radius Proyektil (r)</div>
-                      <div className="font-mono text-[10px] text-blue-300 mb-1">r = (m / (ρ_rock * 4/3 * π))^(1/3)</div>
-                      <div className="font-mono text-[10px] text-neutral-400 mb-2">r = ({activeResult.telemetry.mass.toFixed(1)} / ({activeResult.telemetry.rockDensity} * 1.333 * 3.14))^(1/3)</div>
-                      <div className="font-mono text-sm text-neutral-200">r = {activeResult.telemetry.radius.toFixed(3)} m</div>
+                    <div className="p-4 bg-neutral-900 rounded-xl border border-neutral-800 shadow-sm relative overflow-hidden">
+                      <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl"></div>
+                      <div className="text-xs text-neutral-500 uppercase font-bold mb-3 tracking-wider">Radius Proyektil (r)</div>
+                      
+                      {/* Logo Rumus Manusia */}
+                      <div className="flex items-center text-blue-300 font-serif text-base mb-3 bg-neutral-950/50 p-2 rounded border border-neutral-800/50">
+                        <span className="italic mr-2">r</span> = 
+                        <span className="text-2xl font-light mx-1 text-neutral-500">(</span>
+                        <div className="flex flex-col items-center justify-center mx-1">
+                          <span className="border-b border-blue-400/30 px-3 italic pb-0.5">m</span>
+                          <span className="px-1 pt-0.5 text-sm"><span className="italic">ρ</span><sub className="text-[10px]">rock</sub> &middot; <span className="text-[11px] font-sans">4/3</span> &middot; <span className="italic">π</span></span>
+                        </div>
+                        <span className="text-2xl font-light mx-1 text-neutral-500">)</span>
+                        <sup className="text-xs -mt-5 text-blue-400/80">1/3</sup>
+                      </div>
+                      
+                      <div className="font-mono text-[10px] text-neutral-400 mb-2">
+                        r = ({activeResult.telemetry.mass.toFixed(1)} / ({activeResult.telemetry.rockDensity} * 1.333 * 3.14))^(1/3)
+                      </div>
+                      <div className="font-mono text-sm text-neutral-200">
+                        r = <span className="text-blue-300 font-semibold">{activeResult.telemetry.radius.toFixed(3)}</span> m
+                      </div>
                     </div>
 
                     {/* Initial Mach Number */}
-                    <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
-                      <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Mach Number Awal (M)</div>
-                      <div className="font-mono text-[10px] text-blue-300 mb-1">M = V0 / a_initial<br/>a = √(γ·R·T₀)</div>
-                      <div className="font-mono text-[10px] text-neutral-400 mb-2">M = {activeResult.telemetry.launchVelocity.toFixed(1)} / {activeResult.telemetry.initialA.toFixed(1)}</div>
-                      <div className="font-mono text-sm text-neutral-200">M = {(activeResult.telemetry.launchVelocity / activeResult.telemetry.initialA).toFixed(3)}</div>
-                      <div className={`text-[9px] mt-1 ${(activeResult.telemetry.launchVelocity / activeResult.telemetry.initialA) > 1.0 ? 'text-red-400' : 'text-green-500'}`}>Status: {(activeResult.telemetry.launchVelocity / activeResult.telemetry.initialA) > 1.0 ? 'Supersonic (Shockwave Drag)' : 'Subsonic'}</div>
+                    <div className="p-4 bg-neutral-900 rounded-xl border border-neutral-800 shadow-sm relative overflow-hidden">
+                      <div className="absolute -right-4 -top-4 w-24 h-24 bg-red-500/5 rounded-full blur-2xl"></div>
+                      <div className="text-xs text-neutral-500 uppercase font-bold mb-3 tracking-wider">Mach Number Awal (M)</div>
+                      
+                      {/* Logo Rumus Manusia */}
+                      <div className="flex items-center text-blue-300 font-serif text-base mb-3 bg-neutral-950/50 p-2 rounded border border-neutral-800/50">
+                        <span className="italic mr-2">M</span> = 
+                        <div className="flex flex-col items-center justify-center mx-2">
+                          <span className="border-b border-blue-400/30 px-2 italic text-sm pb-0.5">V<sub className="text-[9px]">0</sub></span>
+                          <span className="px-1 text-xs pt-0.5 italic">a<sub className="text-[9px]">initial</sub></span>
+                        </div>
+                        <span className="mx-2 text-neutral-600 text-xs font-sans">,</span>
+                        <span className="italic mr-1 text-sm text-neutral-400">a</span> <span className="text-neutral-400 text-sm">= &radic;</span>
+                        <span className="border-t border-neutral-400 px-1 ml-0.5 text-xs text-neutral-400 mt-1"><span className="italic">γ &middot; R &middot; T<sub className="text-[9px]">0</sub></span></span>
+                      </div>
+                      
+                      <div className="font-mono text-[10px] text-neutral-400 mb-2">
+                        M = {activeResult.telemetry.launchVelocity.toFixed(1)} / {activeResult.telemetry.initialA.toFixed(1)}
+                      </div>
+                      <div className="font-mono text-sm text-neutral-200">
+                        M = <span className="text-blue-300 font-semibold">{(activeResult.telemetry.launchVelocity / activeResult.telemetry.initialA).toFixed(3)}</span>
+                      </div>
+                      <div className={`text-[10px] mt-1.5 font-medium px-2 py-0.5 inline-block rounded ${(activeResult.telemetry.launchVelocity / activeResult.telemetry.initialA) > 1.0 ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+                        {(activeResult.telemetry.launchVelocity / activeResult.telemetry.initialA) > 1.0 ? 'Supersonic (Shockwave Drag Active)' : 'Subsonic'}
+                      </div>
                     </div>
 
                     {/* Gaya Hambat Udara (Drag) */}
-                    <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
-                      <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Gaya Hambat Awal (F_drag)</div>
-                      <div className="font-mono text-[10px] text-blue-300 mb-1">F_drag = ½ * ρ * V0² * Cd * A</div>
-                      <div className="font-mono text-[10px] text-neutral-400 mb-2">F_drag = 0.5 * {activeResult.telemetry.initialRho.toFixed(3)} * {Math.pow(activeResult.telemetry.launchVelocity, 2).toFixed(1)} * {activeResult.telemetry.baseCd} * {(Math.PI * Math.pow(activeResult.telemetry.radius, 2)).toFixed(3)}</div>
-                      <div className="font-mono text-sm text-neutral-200">F_drag = {((0.5 * activeResult.telemetry.initialRho * Math.pow(activeResult.telemetry.launchVelocity, 2) * activeResult.telemetry.baseCd * (Math.PI * Math.pow(activeResult.telemetry.radius, 2))) / 1000).toFixed(2)} kN</div>
+                    <div className="p-4 bg-neutral-900 rounded-xl border border-neutral-800 shadow-sm relative overflow-hidden">
+                      <div className="absolute -right-4 -top-4 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl"></div>
+                      <div className="text-xs text-neutral-500 uppercase font-bold mb-3 tracking-wider">Gaya Hambat Awal (F_drag)</div>
+                      
+                      {/* Logo Rumus Manusia */}
+                      <div className="flex items-center text-blue-300 font-serif text-base mb-3 bg-neutral-950/50 p-2 rounded border border-neutral-800/50">
+                        <span className="italic mr-2">F<sub className="text-[10px]">drag</sub></span> = 
+                        <div className="flex flex-col items-center justify-center mx-2 text-sm">
+                          <span className="border-b border-blue-400/30 px-1 pb-0.5 font-sans">1</span>
+                          <span className="px-1 pt-0.5 font-sans">2</span>
+                        </div>
+                        <span className="italic mx-1">ρ</span> &middot; <span className="italic mx-1">V<sub className="text-[10px]">0</sub><sup className="text-[10px] -mt-2">2</sup></span> &middot; <span className="italic mx-1">C<sub className="text-[10px]">d</sub></span> &middot; <span className="italic mx-1">A</span>
+                      </div>
+
+                      <div className="font-mono text-[10px] text-neutral-400 mb-2">
+                        F_drag = 0.5 * {activeResult.telemetry.initialRho.toFixed(3)} * {Math.pow(activeResult.telemetry.launchVelocity, 2).toFixed(1)} * {activeResult.telemetry.baseCd} * {(Math.PI * Math.pow(activeResult.telemetry.radius, 2)).toFixed(3)}
+                      </div>
+                      <div className="font-mono text-sm text-neutral-200">
+                        F_drag = <span className="text-orange-400 font-semibold">{((0.5 * activeResult.telemetry.initialRho * Math.pow(activeResult.telemetry.launchVelocity, 2) * activeResult.telemetry.baseCd * (Math.PI * Math.pow(activeResult.telemetry.radius, 2))) / 1000).toFixed(2)}</span> kN
+                      </div>
                     </div>
 
                     {/* Parameter Coriolis */}
-                    <div className="p-3 bg-neutral-900 rounded border border-neutral-800">
-                      <div className="text-xs text-neutral-500 uppercase font-bold mb-2">Parameter Coriolis (f)</div>
-                      <div className="font-mono text-[10px] text-blue-300 mb-1">f = 2 * Ω * sin(latitude)</div>
-                      <div className="font-mono text-[10px] text-neutral-400 mb-2">f = 2 * 0.000072921 * sin(lat_rad)</div>
-                      <div className="font-mono text-sm text-neutral-200">f = {activeResult.telemetry.coriolisF.toExponential(4)} s⁻¹</div>
-                      <div className={`text-[9px] mt-1 ${trajectoryType === 'primary' ? 'text-orange-400' : 'text-red-400'}`}>Membelokkan partikel ke {(activeResult.telemetry.coriolisF > 0) ? 'Kanan (Utara)' : (activeResult.telemetry.coriolisF < 0) ? 'Kiri (Selatan)' : 'Nihil (Ekuator)'}</div>
+                    <div className="p-4 bg-neutral-900 rounded-xl border border-neutral-800 shadow-sm relative overflow-hidden">
+                      <div className="absolute -right-4 -top-4 w-24 h-24 bg-green-500/5 rounded-full blur-2xl"></div>
+                      <div className="text-xs text-neutral-500 uppercase font-bold mb-3 tracking-wider">Parameter Coriolis (f)</div>
+                      
+                      {/* Logo Rumus Manusia */}
+                      <div className="flex items-center text-blue-300 font-serif text-base mb-3 bg-neutral-950/50 p-2 rounded border border-neutral-800/50">
+                        <span className="italic mr-2">f</span> = <span className="font-sans ml-1 mr-1.5">2</span> &middot; <span className="mx-1.5">&Omega;</span> &middot; <span className="font-sans ml-1.5">sin(</span><span className="italic mx-0.5 text-sm">lat</span><span className="font-sans">)</span>
+                      </div>
+
+                      <div className="font-mono text-[10px] text-neutral-400 mb-2">
+                        f = 2 * 0.000072921 * sin(lat_rad)
+                      </div>
+                      <div className="font-mono text-sm text-neutral-200">
+                        f = <span className="text-green-400 font-semibold">{activeResult.telemetry.coriolisF.toExponential(4)}</span> s⁻¹
+                      </div>
+                      <div className={`text-[10px] mt-1.5 font-medium px-2 py-0.5 inline-block rounded ${trajectoryType === 'primary' ? 'bg-orange-500/10 text-orange-400' : 'bg-red-500/10 text-red-400'}`}>
+                        Membelokkan partikel ke {(activeResult.telemetry.coriolisF > 0) ? 'Kanan (Utara)' : (activeResult.telemetry.coriolisF < 0) ? 'Kiri (Selatan)' : 'Nihil (Ekuator)'}
+                      </div>
                     </div>
                   </div>
 

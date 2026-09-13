@@ -138,8 +138,11 @@ export default function KrakatoaDashboard() {
               </div>
             </div>
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-sky-300 via-blue-500 to-[#005ea2] drop-shadow-sm pb-2">
-              Simulasi Trajektori<br />Letusan Gunung
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight drop-shadow-sm pb-2 flex flex-col items-center gap-2">
+              <span className="text-white">Mountosim</span>
+              <span className="text-2xl md:text-3xl lg:text-4xl text-transparent bg-clip-text bg-gradient-to-br from-sky-300 via-blue-500 to-[#005ea2]">
+                Simulasi Trajektori Letusan Gunung
+              </span>
             </h1>
           </motion.div>
 
@@ -213,15 +216,44 @@ export default function KrakatoaDashboard() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.5 }}
-        className="h-screen w-screen bg-black flex items-center justify-center relative z-50 overflow-hidden"
+        className="h-screen w-screen bg-black flex flex-col items-center justify-center relative z-50 overflow-hidden"
       >
         <motion.div
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1.5, opacity: 1 }}
-          transition={{ duration: 1.5, ease: "easeOut" }}
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
           className="flex flex-col items-center justify-center"
         >
-          <img src="/image.png" alt="Logo UNS Transition" className="w-40 h-40 object-contain drop-shadow-[0_0_40px_rgba(14,165,233,0.8)]" />
+          <img src="/image.png" alt="Logo UNS Transition" className="w-32 h-32 md:w-40 md:h-40 object-contain drop-shadow-[0_0_40px_rgba(14,165,233,0.8)] mb-10" />
+          
+          <div className="w-64 flex flex-col items-center gap-4">
+            {/* Loading Bar Container */}
+            <div className="h-1 w-full bg-neutral-900 rounded-full overflow-hidden border border-neutral-800">
+              <motion.div 
+                initial={{ width: "0%" }}
+                animate={{ width: "100%" }}
+                transition={{ duration: 1.8, ease: "easeInOut" }}
+                className="h-full bg-gradient-to-r from-sky-400 to-blue-600 rounded-full relative"
+              >
+                <div className="absolute inset-0 bg-white/20 blur-[2px] animate-pulse"></div>
+              </motion.div>
+            </div>
+            
+            {/* Loading Text */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="text-sky-400 font-mono text-[10px] md:text-xs tracking-widest uppercase flex gap-1 items-center"
+            >
+              <span className="animate-pulse opacity-80">Mempersiapkan Simulasi</span>
+              <span className="flex gap-0.5 ml-1">
+                <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0 }}>.</motion.span>
+                <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.2 }}>.</motion.span>
+                <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.4 }}>.</motion.span>
+              </span>
+            </motion.div>
+          </div>
         </motion.div>
       </motion.div>
     );

@@ -2,19 +2,19 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: 'Simulasi Trajektori Letusan Gunung Api | Informatika UNS',
+  title: 'Mountosim: Simulasi Trajektori Letusan Gunung Api | Informatika UNS',
   description: 'Simulator trajektori vulkanik interaktif untuk memprediksi sebaran proyektil dan awan abu vulkanik.',
   icons: {
     icon: '/image.png',
   },
   openGraph: {
-    title: 'Simulasi Trajektori Letusan Gunung Api',
+    title: 'Mountosim: Simulasi Trajektori Letusan Gunung Api',
     description: 'Simulator trajektori vulkanik interaktif.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Simulasi Trajektori Letusan Gunung Api',
+    title: 'Mountosim: Simulasi Trajektori Letusan Gunung Api',
     description: 'Simulator trajektori vulkanik interaktif.',
   },
 };
