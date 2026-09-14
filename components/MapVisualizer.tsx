@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup, CircleMarker, Circle, useMap, LayersControl, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, CircleMarker, Circle, useMap, LayersControl, Tooltip, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { PhysicsParams, TrajectoryPoint, AshPoint } from '@/utils/physics';
@@ -27,6 +27,7 @@ interface Props {
   };
   progressIndex: number;
   params: PhysicsParams;
+  onLocationSelect?: (lat: number, lng: number) => void;
 }
 
 function MapController({ mode, startPosLat, startPosLng }: { mode: SimulationMode, startPosLat: number, startPosLng: number }) {
@@ -43,7 +44,18 @@ function MapController({ mode, startPosLat, startPosLng }: { mode: SimulationMod
   return null;
 }
 
-export default function MapVisualizer({ mode, ballisticResult, aerosolResult, progressIndex, params }: Props) {
+function MapEventsHandler({ onLocationSelect }: { onLocationSelect?: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click(e) {
+      if (onLocationSelect) {
+        onLocationSelect(e.latlng.lat, e.latlng.lng);
+      }
+    },
+  });
+  return null;
+}
+
+export default function MapVisualizer({ mode, ballisticResult, aerosolResult, progressIndex, params, onLocationSelect }: Props) {
   const [showTooltip, setShowTooltip] = useState(true);
   const primary = ballisticResult.primary.trajectory;
   const startPos: [number, number] = [primary[0]?.lat || -6.102, primary[0]?.lng || 105.423];
@@ -69,6 +81,7 @@ export default function MapVisualizer({ mode, ballisticResult, aerosolResult, pr
         className="w-full h-full"
         scrollWheelZoom={true}
       >
+        <MapEventsHandler onLocationSelect={onLocationSelect} />
         <MapController mode={mode} startPosLat={startPos[0]} startPosLng={startPos[1]} />
         <LayersControl position="bottomright">
           <LayersControl.BaseLayer checked name="Citra Satelit">

@@ -4,6 +4,7 @@ import { PhysicsParams, AerosolParams } from '@/utils/physics';
 import { KRAKATOA_PRESET, AEROSOL_PRESET, SimulationMode, HISTORICAL_PRESETS } from '@/hooks/useSimulation';
 import { Settings, Wind, Compass, RefreshCw, Play, Pause, Square, Globe, Target, Mountain, History, Info, X, ExternalLink, BookOpen, ChevronDown, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import Link from 'next/link';
 
 interface Props {
   mode: SimulationMode;
@@ -194,13 +195,19 @@ export default function InputPanel({
             <h2 className="text-xl font-bold text-white tracking-tight">Simulator Erupsi</h2>
             <p className="text-xs text-neutral-400">Advanced Physical Simulation</p>
           </div>
-          <button 
+          
+          <div className="flex gap-2">
+            <Link href="/custom" className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-md transition-colors" title="Simulasi Kustom (Pilih Titik)">
+              <Target className="w-5 h-5" />
+            </Link>
+            <button 
             onClick={() => setShowInfo(true)}
             className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-md transition-colors"
             title="Daftar Pustaka"
           >
             <BookOpen className="w-5 h-5" />
           </button>
+          </div>
         </div>
 
         <div className={`flex p-1 rounded-lg ${tutorialStep === 2 ? 'relative z-[10000] ring-2 ring-orange-500 shadow-[0_0_30px_rgba(234,88,12,0.3)] bg-neutral-800 pointer-events-none' : 'bg-neutral-800'}`}>
