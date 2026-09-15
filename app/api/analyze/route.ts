@@ -1,6 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = 'edge';
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const ai = new GoogleGenAI({
@@ -74,7 +77,7 @@ Be realistic and authoritative but easy to understand. Format the output in Mark
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-3.5-flash",
       contents: prompt,
     });
 
